@@ -1,0 +1,49 @@
+// --- Updated Budget Model ---
+model Budget {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    targetAmount Float
+
+    userId String @db.ObjectId
+    user   User   @relation(fields: [userId], references: [id])
+
+    // Relationships
+    incomeSources IncomeSource[]
+    expenseItems  ExpenseItem[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("budget")
+}
+
+// --- New Model: IncomeSource ---
+model IncomeSource {
+    id     String  @id @default(auto()) @map("_id") @db.ObjectId
+    name   String?
+    amount Float
+
+    budgetId String @db.ObjectId
+    budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("income_source")
+}
+
+// --- New Model: ExpenseItem ---
+model ExpenseItem {
+    id          String  @id @default(auto()) @map("_id") @db.ObjectId
+    name        String?
+    totalAmount Float
+    spentAmount Float   @default(0)
+
+    budgetId String @db.ObjectId
+    budget   Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("expense_item")
+}

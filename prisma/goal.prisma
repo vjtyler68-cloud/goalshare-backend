@@ -1,0 +1,87 @@
+model Goal {
+    id           String       @id @default(auto()) @map("_id") @db.ObjectId
+    title        String
+    clientTarget Int
+    description  String
+    category     GoalCategory
+    priority     GoalPriority
+    dueDate      DateTime
+    status       GoalStatus   @default(PENDING)
+
+    userId String @db.ObjectId
+    user   User   @relation(fields: [userId], references: [id])
+
+    clients      Client[]
+    myWhies      MyWhy[]
+    affirmations Affirmation[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("goal")
+}
+
+model Client {
+    id        String       @id @default(auto()) @map("_id") @db.ObjectId
+    name      String?
+    phone     String?
+    notes     String?
+    timeSpent DateTime?
+    //   timeSpent Int @default(0)
+    status    ClientStatus @default(PENDING)
+
+    goalId String @db.ObjectId
+    goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("client")
+}
+
+model MyWhy {
+    id   String @id @default(auto()) @map("_id") @db.ObjectId
+    text String
+
+    goalId String @db.ObjectId
+    goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Affirmation {
+    id   String @id @default(auto()) @map("_id") @db.ObjectId
+    text String
+
+    goalId String @db.ObjectId
+    goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+enum GoalPriority {
+    High
+    Medium
+    Low
+}
+
+enum GoalCategory {
+    Daily
+    Weekly
+    Monthly
+    Yearly
+}
+
+enum GoalStatus {
+    PENDING
+    COMPLETED
+}
+
+enum ClientStatus {
+    PENDING
+    REACHED
+    TALKED_TO
+    COMPLETED
+}

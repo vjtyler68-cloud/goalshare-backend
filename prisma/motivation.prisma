@@ -1,0 +1,13 @@
+model Motivation {
+    id    String @id @default(auto()) @map("_id") @db.ObjectId
+    title String
+    image String
+
+    userId String @db.ObjectId
+    user   User   @relation(fields: [userId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("motivation")
+}
