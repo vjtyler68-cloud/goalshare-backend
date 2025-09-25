@@ -1,6 +1,5 @@
 import { createServer, Server as HTTPServer } from 'http';
 import app from './app';
-
 import config from './config';
 import { Server } from 'socket.io';
 import { initSocket } from './app/utils/socket';
