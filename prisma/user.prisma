@@ -22,8 +22,11 @@ model User {
   isApproved      Boolean @default(false)
   isDeleted       Boolean @default(false)
 
-  subscriptionId String?       @db.ObjectId
-  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+  hasUsedFree       Boolean       @default(false)
+  subscriptionId    String?       @db.ObjectId
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
 
   sentMessages     Message[]          @relation("SentMessages")
   receivedMessages Message[]          @relation("ReceivedMessages")

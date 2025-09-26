@@ -33,7 +33,6 @@ const getAllPayments = async (query: Record<string, any>) => {
         select: {
           profile: true,
           fullName: true,
-
           email: true,
         },
       },

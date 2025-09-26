@@ -24,6 +24,27 @@ const getAllSubscription = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const assignSubscription = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user.id;
+  const { subscriptionId } = req.body;
+
+  const result = await SubscriptionServices.assignSubscriptionToUser(
+    userId,
+    subscriptionId,
+  );
+
+  return sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+    data: {
+      user: result.user,
+      subscription: result.subscription,
+      checkoutUrl: result.checkoutUrl,
+    },
+  });
+});
+
 const getMySubscription = catchAsync(async (req: Request, res: Response) => {
   const userId = req.user.id;
   const result = await SubscriptionServices.getMySubscription(userId);
@@ -70,6 +91,7 @@ const deleteIntoDb = catchAsync(async (req: Request, res: Response) => {
 export const SubscriptionController = {
   createIntoDb,
   getAllSubscription,
+  assignSubscription,
   getSubscriptionById,
   updateIntoDb,
   deleteIntoDb,

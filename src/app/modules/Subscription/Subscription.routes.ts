@@ -2,6 +2,7 @@ import express from 'express';
 import { SubscriptionController } from './Subscription.controller';
 import auth from '../../middlewares/auth';
 import { UserRoleEnum } from '@prisma/client';
+import { ensureApproved } from '../../middlewares/ensureApprove';
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ router.get(
 router.get(
   '/my-subscription',
   auth(UserRoleEnum.USER),
+  // ensureApproved,
   SubscriptionController.getMySubscription,
 );
 router.get(
@@ -20,6 +22,13 @@ router.get(
   auth(UserRoleEnum.ADMIN, UserRoleEnum.USER),
   SubscriptionController.getSubscriptionById,
 );
+//user-select subscription
+router.post(
+  '/assign',
+  auth(UserRoleEnum.USER),
+  SubscriptionController.assignSubscription,
+);
+// admin create subscription
 router.post('/', auth(UserRoleEnum.ADMIN), SubscriptionController.createIntoDb);
 router.put(
   '/:id',

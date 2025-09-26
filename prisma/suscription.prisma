@@ -3,6 +3,7 @@ model Subscription {
     title            String
     price            Float
     duration         Int
+    stripePriceId    String?
     subscriptionType SubscriptionType
 
     user    User[]
@@ -19,64 +20,3 @@ enum SubscriptionType {
     MONTHLY
     YEARLY
 }
-
-// model User {
-//   id                String       @id @default(auto()) @map("_id") @db.ObjectId
-//   fullName          String
-//   email             String       @unique
-//   phoneNumber       String?      @unique
-//   password          String
-//   role              UserRoleEnum @default(USER)
-//   status            UserStatus   @default(ACTIVE)
-//   describe          String?
-//   city              String?
-//   address           String?
-//   profile           String?
-//   isAgreeWithTerms  Boolean
-//   otp               String?
-//   otpExpiry         DateTime?
-//   isEmailVerified   Boolean @default(false)
-//   isApproved        Boolean @default(false)
-//   isDeleted         Boolean @default(false)
-
-//   subscriptionId    String?       @db.ObjectId
-//   subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
-//   subscriptionStart DateTime?
-//   subscriptionEnd   DateTime?
-//   hasUsedFree       Boolean       @default(false)
-
-//   payments          Payment[]
-//   createdAt         DateTime @default(now())
-//   updatedAt         DateTime @updatedAt
-
-//   @@map("users")
-// }
-
-// enum UserRoleEnum {
-//   USER
-//   ADMIN
-// }
-
-// enum UserStatus {
-//   ACTIVE
-//   SUSPENDED
-// }
-
-// model Subscription {
-//   id               String           @id @default(auto()) @map("_id") @db.ObjectId
-//   title            String
-//   price            Float
-//   duration         Int              // in days for FREE, months for MONTHLY, years for YEARLY
-//   subscriptionType SubscriptionType
-//   user             User[]
-//   payment          Payment[]
-//   createdAt        DateTime @default(now())
-//   updatedAt        DateTime @updatedAt
-//   @@map("subscription")
-// }
-
-// enum SubscriptionType {
-//   FREE
-//   MONTHLY
-//   YEARLY
-// }
