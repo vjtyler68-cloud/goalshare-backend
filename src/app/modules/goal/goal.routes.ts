@@ -17,6 +17,11 @@ router.patch(
   auth(UserRoleEnum.USER),
   GoalController.updateGoalStatus,
 );
+router.patch(
+  '/:goalId/update-timeSpent',
+  auth(UserRoleEnum.USER),
+  GoalController.goalBreakTimeSpent,
+);
 
 // Client routes
 //client view details

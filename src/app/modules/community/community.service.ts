@@ -69,6 +69,28 @@ const getCommunityByIdFromDB = async (id: string) => {
   return result;
 };
 
+const getAllUsersForCommunityDB = async (query: any) => {
+  const usersQuery = new QueryBuilder<typeof prisma.user>(prisma.user, query);
+
+  const result = await usersQuery
+    .search(['fullName', 'email', 'address', 'city'])
+    .filter()
+    .sort()
+    .fields()
+    .exclude()
+    .paginate()
+    .customFields({
+      id: true,
+      profile: true,
+      fullName: true,
+      email: true,
+      address: true,
+      city: true,
+    })
+    .execute();
+  return result;
+};
+
 const getMyCommunities = async (userId: string, query: any) => {
   const communityQuery = new QueryBuilder<typeof prisma.community>(
     prisma.community,
@@ -176,4 +198,5 @@ export const CommunityServices = {
   updateIntoDb,
   deleteIntoDb,
   getMyCommunities,
+  getAllUsersForCommunityDB,
 };

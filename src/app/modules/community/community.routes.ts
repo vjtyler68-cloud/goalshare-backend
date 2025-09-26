@@ -8,6 +8,11 @@ const router = express.Router();
 
 router.get('/', CommunityController.getAllCommunity);
 router.get(
+  '/all-community-users',
+  auth(UserRoleEnum.USER),
+  CommunityController.getAllUsersForCommunityDB,
+);
+router.get(
   '/my-communities',
   auth(UserRoleEnum.USER),
   CommunityController.getMyCommunities,

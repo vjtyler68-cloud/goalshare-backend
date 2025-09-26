@@ -8,8 +8,32 @@ model Message {
     createdAt  DateTime @default(now())
     updatedAt  DateTime @updatedAt
 
-    sender   User @relation("SentMessages", fields: [senderId], references: [id])
-    receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+    sender      User       @relation("SentMessages", fields: [senderId], references: [id])
+    receiver    User       @relation("ReceivedMessages", fields: [receiverId], references: [id])
+    Community   Community? @relation(fields: [communityId], references: [id])
+    communityId String?    @db.ObjectId
 
     @@map("messages")
 }
+
+//community with personal message
+// model Message {
+//     id       String @id @default(auto()) @map("_id") @db.ObjectId
+//     senderId String @db.ObjectId
+
+//     receiverId  String? @db.ObjectId
+//     communityId String? @db.ObjectId
+
+//     content   String
+//     fileUrls  String[] @default([])
+//     isRead    Boolean  @default(false)
+//     createdAt DateTime @default(now())
+//     updatedAt DateTime @updatedAt
+
+//     // Relationships 
+//     sender    User       @relation("SentMessages", fields: [senderId], references: [id])
+//     receiver  User?      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+//     community Community? @relation(fields: [communityId], references: [id])
+
+//     @@map("messages")
+// }

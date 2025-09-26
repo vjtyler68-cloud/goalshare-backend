@@ -1,6 +1,8 @@
 import { Request } from 'express';
 import { prisma } from '../../utils/prisma';
-import { GoalCategory } from '@prisma/client';
+import { GoalCategory, GoalPriority, GoalStatus } from '@prisma/client';
+import AppError from '../../errors/AppError';
+import httpStatus from 'http-status';
 
 interface PaginationQuery {
   page?: number | string;
@@ -13,6 +15,18 @@ const createGoal = async (req: Request, userId: string) => {
   const { title, clientTarget, description, category, priority, dueDate } =
     req.body;
 
+  const goalDueDate = new Date(dueDate);
+  const now = new Date();
+
+  // now.setHours(0, 0, 0, 0);
+
+  if (goalDueDate < now) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      'Goal due date cannot be a date in the past.',
+    );
+  }
+
   return await prisma.goal.create({
     data: {
       title,
@@ -20,7 +34,7 @@ const createGoal = async (req: Request, userId: string) => {
       description,
       category,
       priority,
-      dueDate: new Date(dueDate),
+      dueDate: goalDueDate,
       userId,
     },
   });
@@ -36,7 +50,11 @@ const getMyGoals = async (userId: string, query: PaginationQuery) => {
   const baseWhere = {
     userId,
 
-    ...(categoryFilter && { category: categoryFilter as GoalCategory }),
+    ...(categoryFilter && {
+      category: categoryFilter as GoalCategory,
+      priority: categoryFilter as GoalPriority,
+      status: categoryFilter as GoalStatus,
+    }),
   };
 
   const total = await prisma.goal.count({ where: baseWhere });
@@ -155,6 +173,13 @@ const updateGoalStatus = async (
   return await prisma.goal.update({ where: { id }, data: { status } });
 };
 
+const goalBreakTimeSpent = async (goalId: string, breakTimeSpent: any) => {
+  return await prisma.goal.update({
+    where: { id: goalId },
+    data: { breakTimeSpent },
+  });
+};
+
 // ---------- Client ----------
 const addClient = async (
   goalId: string,
@@ -214,6 +239,7 @@ const updateClientStatus = async (
     data: { status },
   });
 };
+
 const updateClientTimeSpent = async (clientId: string, timeSpent: any) => {
   return await prisma.client.update({
     where: { id: clientId },
@@ -238,6 +264,7 @@ export const GoalServices = {
   updateGoal,
   deleteGoal,
   updateGoalStatus,
+  goalBreakTimeSpent,
 
   addClient,
   getClientById,

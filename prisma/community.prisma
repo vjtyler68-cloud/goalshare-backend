@@ -9,6 +9,7 @@ model Community {
     user User? @relation(fields: [userId], references: [id])
 
     users     CommunityMembers[]
+    message   Message[]
     createdAt DateTime           @default(now())
     updatedAt DateTime           @updatedAt
 
@@ -16,11 +17,15 @@ model Community {
 }
 
 model CommunityMembers {
-    id          String    @id @default(auto()) @map("_id") @db.ObjectId
-    userId      String    @db.ObjectId
-    communityId String    @db.ObjectId
-    user        User      @relation(fields: [userId], references: [id])
-    community   Community @relation(fields: [communityId], references: [id])
+    id          String @id @default(auto()) @map("_id") @db.ObjectId
+    userId      String @db.ObjectId
+    communityId String @db.ObjectId
+
+    isMuted Boolean @default(false)
+    isLeft  Boolean @default(false)
+
+    user      User      @relation(fields: [userId], references: [id])
+    community Community @relation(fields: [communityId], references: [id])
 
     @@map("community_members")
 }

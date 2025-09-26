@@ -12,6 +12,7 @@ import { CommunityRoutes } from '../modules/community/community.routes';
 import { MetaRoutes } from '../modules/meta/analytics.route';
 import { GoalRoutes } from '../modules/goal/goal.routes';
 import { BudgetRoutes } from '../modules/budget/budget.routes';
+import { PaymentRoutes } from '../modules/Payment/payment.route';
 
 const router = express.Router();
 
@@ -67,6 +68,10 @@ const moduleRoutes = [
   {
     path: '/budget',
     route: BudgetRoutes,
+  },
+  {
+    path: '/payment',
+    route: PaymentRoutes,
   },
 ];
 

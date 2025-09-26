@@ -60,12 +60,10 @@ const singleTransactionHistory = async (query: {
       stripeSessionId: true,
       currency: true,
       status: true,
-
       user: {
         select: {
           profile: true,
           fullName: true,
-
           email: true,
         },
       },

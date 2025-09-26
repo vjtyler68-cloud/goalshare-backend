@@ -70,6 +70,19 @@ const updateGoalStatus = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const goalBreakTimeSpent = catchAsync(async (req: Request, res: Response) => {
+  const result = await GoalServices.goalBreakTimeSpent(
+    req.params.goalId,
+    req.body.breakTimeSpent,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Goal break time spent updated successfully',
+    data: result,
+  });
+});
+
 // Client
 const addClient = catchAsync(async (req: Request, res: Response) => {
   const result = await GoalServices.addClient(req.params.goalId, req.body);
@@ -160,6 +173,7 @@ export const GoalController = {
   updateGoal,
   deleteGoal,
   updateGoalStatus,
+  goalBreakTimeSpent,
 
   addClient,
   getClientById,

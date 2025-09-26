@@ -14,9 +14,10 @@ model Payment {
     cardExpMonth      Int?
     cardExpYear       Int?
 
-    stripePaymentId  String?
-    stripeSessionId  String? @unique
-    stripeCustomerId String?
+    stripeSessionId      String? @unique
+    stripePaymentId      String? @unique
+    stripeSubscriptionId String? @unique
+    stripeCustomerId     String?
 
     user         User         @relation(fields: [userId], references: [id])
     subscription Subscription @relation(fields: [subscriptionId], references: [id])

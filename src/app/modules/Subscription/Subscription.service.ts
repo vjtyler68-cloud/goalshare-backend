@@ -151,17 +151,24 @@ const assignSubscriptionToUser = async (
       );
 
     const session = await stripe.checkout.sessions.create({
-      mode: 'subscription', // recurring
+      mode: 'subscription',
       success_url: `${config.base_url_client}/checkout/complete?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${config.base_url_client}/checkout/cancel?paymentId=${payment.id}`,
       line_items: [
         {
-          price: subscription.stripePriceId, // must not be null
+          price: subscription.stripePriceId,
           quantity: 1,
         },
       ],
       customer_email: user.email,
       metadata: { paymentId: payment.id },
+    });
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        stripeSessionId: session.id,
+      },
     });
 
     checkoutUrl = session.url!;
@@ -183,168 +190,56 @@ const getMySubscription = async (userId: string) => {
     where: { id: userId },
     include: {
       subscription: true,
+      payments: {
+        where: {
+          status: PaymentStatus.SUCCESS,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
     },
   });
 
-  return userWithSubscription?.subscription;
+  if (!userWithSubscription || !userWithSubscription.subscription) {
+    return null;
+  }
+
+  const sub = userWithSubscription.subscription;
+
+  if (sub.subscriptionType === SubscriptionType.FREE) {
+    const hasSuccessfulPayment = userWithSubscription.payments.some(
+      payment => payment.subscriptionId === sub.id,
+    );
+
+    if (
+      !userWithSubscription.subscriptionStart ||
+      !userWithSubscription.subscriptionEnd ||
+      !hasSuccessfulPayment
+    ) {
+      return null;
+    }
+  }
+
+  const now = new Date();
+  const end = userWithSubscription.subscriptionEnd || now;
+  const remainingDays = Math.max(
+    Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+    0,
+  );
+
+  return {
+    subscription: {
+      id: sub.id,
+      title: sub.title,
+      type: sub.subscriptionType,
+      duration: sub.duration,
+      startDate: userWithSubscription.subscriptionStart,
+      endDate: userWithSubscription.subscriptionEnd,
+      remainingDays,
+    },
+  };
 };
-
-//*// services/UserSubscription.service.ts
-// import { prisma } from '../../utils/prisma';
-// import bcrypt from 'bcrypt';
-// import AppError from '../../errors/AppError';
-// import httpStatus from 'http-status';
-// import { User, SubscriptionType, PaymentStatus } from '@prisma/client';
-// import { otpExpiryTime } from '../../utils/otpExpiry';
-// import { generateOtpEmail } from '../../utils/emailTemplates';
-// import { emailSender } from '../../utils/emailSender';
-
-// interface RegisterPayload extends User {
-//   subscriptionId: string;
-// }
-
-// // ==========================
-// // REGISTER USER WITH SUBSCRIPTION
-// // ==========================
-// export const registerWithSubscription = async (payload: RegisterPayload) => {
-//   const hashedPassword = await bcrypt.hash(payload.password, 12);
-
-//   // 1️⃣ Check if user exists
-//   const existingUser = await prisma.user.findUnique({
-//     where: { email: payload.email },
-//   });
-//   if (existingUser) throw new AppError(httpStatus.CONFLICT, 'User already exists');
-
-//   // 2️⃣ Generate OTP
-//   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-//   // 3️⃣ Fetch subscription by ID
-//   const subscription = await prisma.subscription.findUnique({
-//     where: { id: payload.subscriptionId },
-//   });
-//   if (!subscription) throw new AppError(httpStatus.BAD_REQUEST, 'Subscription not found');
-
-//   const userData: any = {
-//     ...payload,
-//     password: hashedPassword,
-//     otp,
-//     otpExpiry: otpExpiryTime(),
-//   };
-
-//   // -------------------
-//   // FREE subscription
-//   // -------------------
-//   if (subscription.subscriptionType === SubscriptionType.FREE) {
-//     if (existingUser?.hasUsedFree) {
-//       throw new AppError(httpStatus.CONFLICT, 'You have already used FREE subscription');
-//     }
-
-//     const startDate = new Date();
-//     const endDate = new Date();
-//     endDate.setDate(endDate.getDate() + subscription.duration);
-
-//     const newUser = await prisma.user.create({
-//       data: {
-//         ...userData,
-//         subscriptionId: subscription.id,
-//         subscriptionStart: startDate,
-//         subscriptionEnd: endDate,
-//         hasUsedFree: true,
-//       },
-//     });
-
-//     // Payment record for FREE subscription (amount 0)
-//     await prisma.payment.create({
-//       data: {
-//         userId: newUser.id,
-//         subscriptionId: subscription.id,
-//         amount: 0,
-//         currency: 'usd',
-//         status: PaymentStatus.SUCCESS,
-//       },
-//     });
-
-//     // Send OTP email
-//     try {
-//       const html = generateOtpEmail(otp);
-//       await emailSender(newUser.email, html, 'OTP Verification');
-//     } catch {
-//       throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to send OTP email');
-//     }
-
-//     return { message: 'Registration successful. Check your mail to verify OTP.' };
-//   }
-
-//   // -------------------
-//   // PAID subscription (MONTHLY/YEARLY)
-//   // -------------------
-//   const startDate = new Date();
-//   const endDate = new Date();
-//   if (subscription.subscriptionType === SubscriptionType.MONTHLY) {
-//     endDate.setMonth(endDate.getMonth() + subscription.duration);
-//   } else if (subscription.subscriptionType === SubscriptionType.YEARLY) {
-//     endDate.setFullYear(endDate.getFullYear() + subscription.duration);
-//   }
-
-//   const newUser = await prisma.user.create({ data: userData });
-
-//   const payment = await prisma.payment.create({
-//     data: {
-//       userId: newUser.id,
-//       subscriptionId: subscription.id,
-//       amount: subscription.price,
-//       currency: 'usd',
-//       status: PaymentStatus.PENDING,
-//     },
-//   });
-
-//   // Send OTP email
-//   try {
-//     const html = generateOtpEmail(otp);
-//     await emailSender(newUser.email, html, 'OTP Verification');
-//   } catch {
-//     throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to send OTP email');
-//   }
-
-//   return {
-//     message: 'User registered. Check email to verify OTP and complete payment.',
-//     userId: newUser.id,
-//     subscriptionId: subscription.id,
-//     paymentId: payment.id,
-//   };
-// };
-
-// ==========================
-// GET MY SUBSCRIPTION
-// ==========================
-// export const getMySubscription = async (userId: string) => {
-//   const userWithSubscription = await prisma.user.findUnique({
-//     where: { id: userId },
-//     include: { subscription: true },
-//   });
-
-//   if (!userWithSubscription || !userWithSubscription.subscription) return null;
-
-//   const sub = userWithSubscription.subscription;
-//   const now = new Date();
-//   const end = userWithSubscription.subscriptionEnd || now;
-//   const remainingDays = Math.max(
-//     Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
-//     0
-//   );
-
-//   return {
-//     subscription: {
-//       id: sub.id,
-//       title: sub.title,
-//       type: sub.subscriptionType,
-//       duration: sub.duration,
-//       startDate: userWithSubscription.subscriptionStart,
-//       endDate: userWithSubscription.subscriptionEnd,
-//       remainingDays,
-//     },
-//   };
-// };
 
 const getSubscriptionByIdFromDB = async (id: string) => {
   const subscription = await prisma.subscription.findUnique({
@@ -380,6 +275,31 @@ const deleteIntoDb = async (id: string) => {
   return subscription;
 };
 
+const deleteMySubscription = async (userId: string) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  if (!user.subscriptionId) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      'You do not have an active subscription to delete',
+    );
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      subscriptionId: null,
+      subscriptionStart: null,
+      subscriptionEnd: null,
+    },
+  });
+
+  return updatedUser;
+};
+
 export const SubscriptionServices = {
   createIntoDb,
   assignSubscriptionToUser,
@@ -388,4 +308,5 @@ export const SubscriptionServices = {
   updateIntoDb,
   deleteIntoDb,
   getMySubscription,
+  deleteMySubscription,
 };

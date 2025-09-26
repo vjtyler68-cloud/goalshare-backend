@@ -35,6 +35,13 @@ router.put(
   auth(UserRoleEnum.ADMIN),
   SubscriptionController.updateIntoDb,
 );
+
+router.delete(
+  '/delete-my-subscription',
+  auth(UserRoleEnum.USER),
+  SubscriptionController.deleteMySubscription,
+);
+
 router.delete(
   '/:id',
   auth(UserRoleEnum.ADMIN),

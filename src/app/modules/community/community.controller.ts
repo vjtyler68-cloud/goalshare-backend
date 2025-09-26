@@ -27,6 +27,16 @@ const getAllCommunity = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllUsersForCommunityDB = catchAsync(async (req, res) => {
+  const result = await CommunityServices.getAllUsersForCommunityDB(req.query);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    message: 'Users retrieved successfully',
+    ...result,
+  });
+});
+
 const getCommunityById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const result = await CommunityServices.getCommunityByIdFromDB(id);
@@ -78,4 +88,5 @@ export const CommunityController = {
   updateIntoDb,
   deleteIntoDb,
   getMyCommunities,
+  getAllUsersForCommunityDB,
 };

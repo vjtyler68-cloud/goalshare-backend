@@ -10,7 +10,7 @@ const port = config.port || 5000;
 async function main() {
   const server: HTTPServer = createServer(app).listen(port, () => {
     console.log('Sever is running on port ', port);
-    seedSuperAdmin();
+    // seedSuperAdmin();
   });
 
   const io = initSocket(server);

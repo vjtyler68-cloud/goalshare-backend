@@ -14,7 +14,7 @@ const getAllUsersFromDB = async (query: any) => {
   const usersQuery = new QueryBuilder<typeof prisma.user>(prisma.user, query);
 
   const result = await usersQuery
-    .search(['fullName', 'email'])
+    .search(['fullName', 'email', 'address', 'city'])
     .filter()
     .sort()
     .fields()
