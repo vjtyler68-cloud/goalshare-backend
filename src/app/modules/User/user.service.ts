@@ -30,7 +30,28 @@ const getMyProfileFromDB = async (id: string) => {
     where: {
       id: id,
     },
-    include: { subscription: true },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phoneNumber: true,
+      role: true,
+      status: true,
+      describe: true,
+      city: true,
+      address: true,
+      profile: true,
+      subscription: {
+        select: {
+          id: true,
+          title: true,
+          price: true,
+        },
+      },
+      isApproved: true,
+      subscriptionStart: true,
+      subscriptionEnd: true,
+    },
   });
 
   return Profile;

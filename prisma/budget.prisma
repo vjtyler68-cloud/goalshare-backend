@@ -4,6 +4,9 @@ model Budget {
 
     targetAmount Float
 
+    month Int?
+    year  Int?
+
     userId String @db.ObjectId
     user   User   @relation(fields: [userId], references: [id])
 

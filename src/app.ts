@@ -8,7 +8,7 @@ import { StripeWebHook } from './app/utils/StripeUtils';
 const app: Application = express();
 
 app.post(
-  '/api/v1/payments/webhook',
+  '/api/v1/stripe/webhook',
   express.raw({ type: 'application/json' }),
   StripeWebHook,
 );

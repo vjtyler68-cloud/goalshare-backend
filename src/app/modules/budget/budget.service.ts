@@ -1,5 +1,6 @@
-import { Request } from 'express';
+import AppError from '../../errors/AppError';
 import { prisma } from '../../utils/prisma'; // Assuming this path is correct
+import httpStatus from 'http-status';
 
 // Helper function to calculate totals and percentages (NO CHANGE HERE)
 const calculateBudgetSummary = (budget: any) => {
@@ -43,6 +44,9 @@ const getBudgetByUserId = async (userId: string) => {
     select: {
       id: true,
       targetAmount: true,
+      month: true,
+      year: true,
+
       incomeSources: {
         select: {
           id: true,
@@ -69,29 +73,28 @@ const getBudgetByUserId = async (userId: string) => {
 
 // 2. Create or Update the main budget target amount (MODIFIED)
 const createOrUpdateBudget = async (userId: string, targetAmount: number) => {
-  const selectData = {
-    id: true,
-    targetAmount: true,
-    userId: true,
-  };
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
 
   const existingBudget = await prisma.budget.findFirst({
-    where: { userId },
-    select: { id: true },
+    where: {
+      userId: userId,
+      month: currentMonth,
+      year: currentYear,
+    },
   });
 
-  if (existingBudget) {
-    return await prisma.budget.update({
-      where: { id: existingBudget.id },
-      data: { targetAmount },
-      select: selectData,
-    });
-  } else {
-    return await prisma.budget.create({
-      data: { userId, targetAmount },
-      select: selectData,
-    });
-  }
+  const newBudget = await prisma.budget.create({
+    data: {
+      userId,
+      targetAmount,
+      month: currentMonth,
+      year: currentYear,
+    },
+  });
+
+  return newBudget;
 };
 
 // 3. Add a new income source (MODIFIED)

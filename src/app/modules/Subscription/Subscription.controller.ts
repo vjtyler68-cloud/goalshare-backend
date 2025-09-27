@@ -26,22 +26,16 @@ const getAllSubscription = catchAsync(async (req: Request, res: Response) => {
 
 const assignSubscription = catchAsync(async (req: Request, res: Response) => {
   const userId = req.user.id;
-  const { subscriptionId } = req.body;
-
   const result = await SubscriptionServices.assignSubscriptionToUser(
     userId,
-    subscriptionId,
+    req.body,
   );
 
   return sendResponse(res, {
     statusCode: 200,
     success: true,
-    message: result.message,
-    data: {
-      user: result.user,
-      subscription: result.subscription,
-      checkoutUrl: result.checkoutUrl,
-    },
+    // message: result.message,
+    data: result,
   });
 });
 

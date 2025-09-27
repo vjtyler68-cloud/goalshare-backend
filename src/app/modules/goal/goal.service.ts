@@ -64,6 +64,24 @@ const getMyGoals = async (userId: string, query: PaginationQuery) => {
     orderBy: { createdAt: 'desc' },
     skip,
     take: limit,
+    select: {
+      id: true,
+      title: true,
+      clientTarget: true,
+      description: true,
+      category: true,
+      priority: true,
+      dueDate: true,
+      status: true,
+      breakTimeSpent: true,
+
+      clients: {
+        select: {
+          status: true,
+          timeSpent: true,
+        },
+      },
+    },
   });
 
   return {
@@ -112,6 +130,7 @@ const getGoalById = async (id: string) => {
         },
       },
       description: true,
+      breakTimeSpent: true,
     },
   });
 
@@ -153,7 +172,7 @@ const getGoalById = async (id: string) => {
     clientsTalkedToCount,
     salesCompletedCount,
     contactProgress,
-    progressPercentage: Math.min(100, Math.round(progressPercentage)), // Cap at 100%
+    progressPercentage: Math.min(100, Math.round(progressPercentage)),
   };
 };
 
@@ -207,6 +226,34 @@ const addClient = async (
   });
 };
 
+const getAllClientsByGoalId = async (goalId: string) => {
+  await prisma.goal.findUniqueOrThrow({
+    where: { id: goalId },
+    select: { id: true },
+  });
+
+  const clients = await prisma.client.findMany({
+    where: {
+      goalId: goalId,
+    },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      notes: true,
+      status: true,
+      timeSpent: true,
+      goalId: true,
+    },
+  });
+
+  if (clients.length === 0) {
+    console.log(`No clients found for goal ID: ${goalId}`);
+  }
+
+  return clients;
+};
+
 const getClientById = async (id: string) => {
   return await prisma.client.findUnique({
     where: { id },
@@ -234,6 +281,7 @@ const updateClientStatus = async (
   clientId: string,
   status: 'PENDING' | 'REACHED' | 'TALKED_TO' | 'COMPLETED',
 ) => {
+  console.log({ clientId, status });
   return await prisma.client.update({
     where: { id: clientId },
     data: { status },
@@ -267,6 +315,7 @@ export const GoalServices = {
   goalBreakTimeSpent,
 
   addClient,
+  getAllClientsByGoalId,
   getClientById,
   updateClient,
   updateClientTimeSpent,

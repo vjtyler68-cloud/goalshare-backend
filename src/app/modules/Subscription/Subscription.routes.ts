@@ -6,26 +6,18 @@ import { ensureApproved } from '../../middlewares/ensureApprove';
 
 const router = express.Router();
 
-router.get(
-  '/',
-  auth(UserRoleEnum.ADMIN, UserRoleEnum.USER),
-  SubscriptionController.getAllSubscription,
-);
+router.get('/', SubscriptionController.getAllSubscription);
 router.get(
   '/my-subscription',
   auth(UserRoleEnum.USER),
   // ensureApproved,
   SubscriptionController.getMySubscription,
 );
-router.get(
-  '/:id',
-  auth(UserRoleEnum.ADMIN, UserRoleEnum.USER),
-  SubscriptionController.getSubscriptionById,
-);
+router.get('/:id', SubscriptionController.getSubscriptionById);
 //user-select subscription
 router.post(
   '/assign',
-  auth(UserRoleEnum.USER),
+  auth(),
   SubscriptionController.assignSubscription,
 );
 // admin create subscription

@@ -4,6 +4,7 @@ model Subscription {
     price            Float
     duration         Int
     stripePriceId    String?
+    stripeProductId  String?
     subscriptionType SubscriptionType
 
     user    User[]

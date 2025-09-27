@@ -27,7 +27,7 @@ model User {
   hasUsedFree       Boolean       @default(false)
   subscriptionId    String?       @db.ObjectId
   subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
-  stripeCustomerId  String?       @unique
+  stripeCustomerId  String?
 
   sentMessages     Message[]          @relation("SentMessages")
   receivedMessages Message[]          @relation("ReceivedMessages")

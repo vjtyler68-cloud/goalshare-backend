@@ -94,6 +94,15 @@ const addClient = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllClientsByGoal = catchAsync(async (req: Request, res: Response) => {
+  const result = await GoalServices.getAllClientsByGoalId(req.params.goalId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Client details retrieved successfully',
+    data: result,
+  });
+});
 const getClientById = catchAsync(async (req: Request, res: Response) => {
   const result = await GoalServices.getClientById(req.params.clientId);
   sendResponse(res, {
@@ -129,14 +138,14 @@ const updateClientTimeSpent = catchAsync(
 );
 
 const updateClientStatus = catchAsync(async (req: Request, res: Response) => {
-  const result = await GoalServices.updateClientTimeSpent(
+  const result = await GoalServices.updateClientStatus(
     req.params.clientId,
     req.body.status,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Client time spent updated successfully',
+    message: 'Client status updated successfully',
     data: result,
   });
 });
@@ -176,6 +185,7 @@ export const GoalController = {
   goalBreakTimeSpent,
 
   addClient,
+  getAllClientsByGoal,
   getClientById,
   updateClient,
   updateClientTimeSpent,

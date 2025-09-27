@@ -30,6 +30,11 @@ router.get(
   auth(UserRoleEnum.USER),
   GoalController.getClientById,
 );
+router.get(
+  '/:goalId/clients',
+  auth(UserRoleEnum.USER),
+  GoalController.getAllClientsByGoal,
+);
 
 // client info update
 router.patch(
