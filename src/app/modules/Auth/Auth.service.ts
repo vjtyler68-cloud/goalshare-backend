@@ -321,6 +321,7 @@ const forgetPassword = async (email: string) => {
       email,
     },
     select: {
+      email: true,
       status: true,
       id: true,
       otpExpiry: true,
@@ -339,19 +340,20 @@ const forgetPassword = async (email: string) => {
     const message = getOtpStatusMessage(userData.otpExpiry);
     throw new AppError(httpStatus.CONFLICT, message);
   }
-  const otp = generateOTP();
+  const otp: number = Math.floor(100000 + Math.random() * 900000);
   const expireTime = otpExpiryTime();
   try {
     await prisma.$transaction(async tx => {
       await tx.user.update({
         where: { email },
         data: {
-          otp,
+          otp: otp.toString(),
           otpExpiry: expireTime,
         },
       });
       try {
-        await sendOtpViaMail(email, otp);
+        const html = generateOtpEmail(otp);
+        await emailSender(userData.email, html, 'OTP Verification');
       } catch (emailErr) {
         await tx.user.update({
           where: { email },

@@ -1,4 +1,4 @@
-import { UserRoleEnum, UserStatus } from '@prisma/client';
+import { PaymentStatus, UserRoleEnum, UserStatus } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 
 const fetchDashboardMetaData = async (userId: string) => {
@@ -22,21 +22,21 @@ const fetchDashboardMetaData = async (userId: string) => {
   }); // Or you can calculate this as total - suspended
 
   // Fetch the income data for the graph (e.g., last 30 days)
-  //   const incomeData = await prisma.transaction.groupBy({
-  //     by: ['createdAt'],
-  //     _sum: {
-  //       amount: true,
-  //     },
-  //     where: {
-  //       createdAt: {
-  //         gte: new Date(new Date().setDate(new Date().getDate() - 30)), // Last 30 days
-  //       },
-  //       status: 'completed', // Only consider completed transactions
-  //     },
-  //     orderBy: {
-  //       createdAt: 'asc',
-  //     },
-  //   });
+  const incomeData = await prisma.payment.groupBy({
+    by: ['createdAt'],
+    _sum: {
+      amount: true,
+    },
+    where: {
+      createdAt: {
+        gte: new Date(new Date().setDate(new Date().getDate() - 30)),
+      },
+      status: PaymentStatus.SUCCESS,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  });
 
   // Fetch recent pending approvals
   const approvals = await prisma.user.findMany({
@@ -62,14 +62,62 @@ const fetchDashboardMetaData = async (userId: string) => {
       suspended: suspendedUsers,
       active: activeUsers,
     },
-    // income: incomeData.map(item => ({
-    //   date: item.createdAt.toISOString().split('T')[0], // Format date to YYYY-MM-DD
-    //   income: item._sum.amount,
-    // })),
+    income: incomeData.map(item => ({
+      date: item.createdAt.toISOString().split('T')[0],
+      income: item._sum.amount,
+    })),
     approvals: approvals,
   };
 };
 
+const getReportTableData = async (
+  userId: string,
+  startDate: string,
+  endDate: string,
+) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+
+  if (user?.role !== 'ADMIN') {
+    throw new Error('Unauthorized access');
+  }
+
+  const payments = await prisma.payment.findMany({
+    where: {
+      createdAt: {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      },
+      status: PaymentStatus.SUCCESS,  
+    },
+    select: {
+      createdAt: true,
+      user: {
+        select: {
+          fullName: true, 
+        },
+      },
+      amount: true,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  });
+
+  // Map the data to match the table structure (Date, Type, User, Amount)
+  const reportData = payments.map(payment => ({
+    date: payment.createdAt.toISOString().split('T')[0],
+    type: 'Monthly', 
+    user: payment.user.fullName || 'Unknown', 
+    amount: payment.amount || 0, 
+  }));
+
+  return reportData;
+};
+
 export const MetaService = {
   fetchDashboardMetaData,
+  getReportTableData,
 };

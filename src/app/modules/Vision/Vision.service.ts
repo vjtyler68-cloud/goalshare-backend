@@ -49,6 +49,17 @@ const getVisionByIdFromDB = async (id: string) => {
 const getMyVision = async (userId: string) => {
   const vision = await prisma.vision.findMany({
     where: { userId },
+    select: {
+      id: true,
+      year: true,
+      image: true,
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 

@@ -89,6 +89,12 @@ const updateProfileImg = async (
       data: {
         profile: (await location).Location,
       },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: true,
+      },
     });
     if (previousImg) {
       deleteFile(previousImg);
@@ -111,6 +117,18 @@ const updateMyProfileIntoDB = async (
       id,
     },
     data: payload,
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phoneNumber: true,
+      role: true,
+      status: true,
+      describe: true,
+      city: true,
+      address: true,
+      profile: true,
+    },
   });
   return result;
 };
@@ -126,7 +144,7 @@ const updateUserRoleStatusIntoDB = async (id: string, role: UserRoleEnum) => {
   });
   return result;
 };
-const updateProfileStatus = async (id: string, status: UserStatus) => {
+const updateUserStatus = async (id: string, status: UserStatus) => {
   const result = await prisma.user.update({
     where: {
       id,
@@ -225,7 +243,7 @@ export const UserServices = {
   getUserDetailsFromDB,
   updateMyProfileIntoDB,
   updateUserRoleStatusIntoDB,
-  updateProfileStatus,
+  updateUserStatus,
   updateProfileImg,
   updateUserApproval,
   softDeleteUserIntoDB,

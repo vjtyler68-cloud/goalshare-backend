@@ -261,6 +261,7 @@ const getClientById = async (id: string) => {
       name: true,
       phone: true,
       notes: true,
+      status:true
     },
   });
 };

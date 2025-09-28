@@ -2,6 +2,7 @@ import { uploadToDigitalOceanAWS } from '../../utils/uploadToDigitalOceanAWS';
 import { prisma } from '../../utils/prisma';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { Motivation } from '@prisma/client';
+import { title } from 'process';
 
 const createIntoDb = async (
   id: string,
@@ -51,6 +52,17 @@ const getMotivationByIdFromDB = async (id: string) => {
 const getMyMotivation = async (userId: string) => {
   const motivations = await prisma.motivation.findMany({
     where: { userId },
+    select: {
+      id: true,
+      title: true,
+      image: true,
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 

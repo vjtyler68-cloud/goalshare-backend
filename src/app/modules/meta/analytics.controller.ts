@@ -14,7 +14,24 @@ const fetchDashboardMetaData = catchAsync(async (req, res) => {
     data: result,
   });
 });
+const getReportTableData = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { startDate, endDate } = req.query;
+  const result = await MetaService.getReportTableData(
+    userId,
+    startDate as string,
+    endDate as string,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Meta data retrieval successfully!',
+    data: result,
+  });
+});
 
 export const MetaController = {
   fetchDashboardMetaData,
+  getReportTableData,
 };

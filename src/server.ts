@@ -13,7 +13,7 @@ async function main() {
     // seedSuperAdmin();
   });
 
-  const io = initSocket(server);
+  const io = initSocket(server); 
 
   io.on('connection', socket => {
     console.log('User connected:', socket.id);

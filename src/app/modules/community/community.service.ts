@@ -86,6 +86,12 @@ const getAllUsersForCommunityDB = async (query: any) => {
       email: true,
       address: true,
       city: true,
+      communityMembers: {
+        select: {
+          isLeft: true,
+          isMuted: true,
+        },
+      },
     })
     .execute();
   return result;
@@ -153,24 +159,11 @@ const getMyCommunities = async (userId: string, query: any) => {
     .where({
       AND: andConditions,
     })
-    .select({
+    .customFields({
       id: true,
       userId: true,
       name: true,
       image: true,
-      users: {
-        select: {
-          id: true,
-          user: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              profile: true,
-            },
-          },
-        },
-      },
     })
     .execute();
 

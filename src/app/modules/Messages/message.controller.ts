@@ -47,7 +47,7 @@ const getAllConversationUsers = catchAsync(async (req, res) => {
 // Mark message as read
 const markMessageAsRead = catchAsync(async (req, res) => {
   const { messageId } = req.params;
-  const userId = req.user?.id; // assuming you have user from auth middleware
+  const userId = req.user?.id; 
 
   const result = await MessageServices.markMessageAsRead(
     messageId,

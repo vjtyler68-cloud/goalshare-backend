@@ -25,6 +25,7 @@ const getAllPayments = async (query: Record<string, any>) => {
       userId: true,
       paymentMethodType: true,
       createdAt: true,
+      updatedAt:true,
       status: true,
       stripeCustomerId: true,
       stripePaymentId: true,
