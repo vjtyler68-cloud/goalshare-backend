@@ -209,8 +209,8 @@ const hardDeleteUserIntoDB = async (id: string, adminId: string) => {
     async tx => {
       // related tables delete
       await tx.goal.deleteMany({ where: { userId: id } });
-      await tx.message.deleteMany({ where: { senderId: id } });
-      await tx.message.deleteMany({ where: { receiverId: id } });
+      // await tx.message.deleteMany({ where: { senderId: id } });
+      // await tx.message.deleteMany({ where: { receiverId: id } });
       await tx.payment.deleteMany({ where: { userId: id } });
       await tx.motivation.deleteMany({ where: { userId: id } });
       await tx.notificationUser.deleteMany({ where: { userId: id } });

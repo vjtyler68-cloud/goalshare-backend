@@ -29,8 +29,6 @@ model User {
   subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
   stripeCustomerId  String?
 
-  sentMessages     Message[]          @relation("SentMessages")
-  receivedMessages Message[]          @relation("ReceivedMessages")
   payments         Payment[]
   motivation       Motivation[]
   notifications    NotificationUser[]
@@ -42,6 +40,14 @@ model User {
   community Community[]
   goal      Goal[]
   budget    Budget[]
+
+  communityMessage           CommunityMessage[]
+  communityMessageReadStatus CommunityMessageReadStatus[]
+  room                       Room[]                       @relation("RoomSender")
+  Room                       Room[]                       @relation("RoomReceiver")
+  groupMember                GroupMember[]
+  groupChat                  GroupChat[]
+  groupChatReadStatus        GroupChatReadStatus[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

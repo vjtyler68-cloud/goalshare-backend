@@ -417,7 +417,7 @@ export async function setupWebSocket(server: Server) {
                 userId: ws.userId,
                 users: {
                   create: [
-                    { userId: ws.userId }, // creator is member
+                    { userId: ws.userId }, 
                     ...memberIds.map((id: string) => ({
                       userId: id,
                     })),
@@ -537,7 +537,7 @@ export async function setupWebSocket(server: Server) {
 
             // Send message to all online active members
             members.forEach(({ userId }) => {
-              const memberSocket = userSockets.get(userId);
+              const memberSocket = userSockets.get(userId as string);
               if (memberSocket) {
                 memberSocket.send(
                   JSON.stringify({

@@ -77,8 +77,9 @@ const getAllSubscription = async (query: Record<string, any>) => {
 
   return subscriptions;
 };
+
 const assignSubscriptionToUser = async (userId: string, payload: any) => {
-  const { subscriptionId, methodId, stripePriceId } = payload;
+  const { subscriptionId, methodId } = payload;
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError(httpStatus.NOT_FOUND, 'User not found');

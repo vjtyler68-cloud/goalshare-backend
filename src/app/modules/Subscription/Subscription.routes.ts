@@ -2,7 +2,7 @@ import express from 'express';
 import { SubscriptionController } from './Subscription.controller';
 import auth from '../../middlewares/auth';
 import { UserRoleEnum } from '@prisma/client';
-import { ensureApproved } from '../../middlewares/ensureApprove';
+// import { ensureApproved } from '../../middlewares/ensureApprove';
 
 const router = express.Router();
 

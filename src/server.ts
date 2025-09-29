@@ -1,29 +1,26 @@
 import { createServer, Server as HTTPServer } from 'http';
 import app from './app';
 import config from './config';
-import { Server } from 'socket.io';
-import { initSocket } from './app/utils/socket';
 import seedSuperAdmin from './app/DB';
+import { setupWebSocket } from './app/middlewares/webSocket';
 
 const port = config.port || 5000;
 
 async function main() {
-  const server: HTTPServer = createServer(app).listen(port, () => {
-    console.log('Sever is running on port ', port);
+  const server: HTTPServer = createServer(app);
+
+  server.listen(port, async () => {
+    console.log('Server is running on port ', port);
     // seedSuperAdmin();
-  });
 
-  const io = initSocket(server); 
-
-  io.on('connection', socket => {
-    console.log('User connected:', socket.id);
-    socket.on('register', (userId: string) => {
-      socket.join(userId);
-      console.log(`User ${userId} joined their personal room`);
-    });
-    socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
-    });
+    try {
+      await setupWebSocket(server);
+    
+    } catch (error) {
+      console.error('Failed to setup WebSocket:', error);
+      // Optionally close server on failure
+      server.close(() => process.exit(1));
+    }
   });
 
   const exitHandler = () => {
