@@ -7,6 +7,11 @@ import path from 'path';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { StripeWebHook } from './app/utils/StripeUtils';
+import auth from './app/middlewares/auth';
+import { upload } from './app/utils/fileUploader';
+import { uploadToDigitalOceanAWS } from './app/utils/uploadToDigitalOceanAWS';
+import catchAsync from './app/utils/catchAsync';
+import AppError from './app/errors/AppError';
 const app: Application = express();
 
 app.post(
@@ -67,7 +72,26 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/v1', apiLimiter, router);
 
 app.use(globalErrorHandler);
-app.use('/upload', express.static(path.join(__dirname, 'app', 'upload')));
+
+
+router.post(
+  '/upload-image',
+  auth('ANY'),
+  upload.single('image'),
+  catchAsync(async (req: Request, res: Response) => {
+    // catchAsync wrap (type safe + error handle)
+    if (!req.file) {
+      throw new AppError(httpStatus.BAD_REQUEST, 'No image file'); 
+    }
+    const file = req.file;
+
+    const location = await uploadToDigitalOceanAWS(file); 
+    const imageUrl = location.Location; 
+
+    res.status(httpStatus.OK).json({ success: true, imageUrl }); 
+  }),
+);
+
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(httpStatus.NOT_FOUND).json({
     success: false,
