@@ -158,9 +158,13 @@ const getGoalById = async (id: string) => {
     client => client.status === 'COMPLETED',
   ).length;
 
+  const totalReached =
+    clientsReachedCount + clientsTalkedToCount + salesCompletedCount;
+  const totalTalkedTo = clientsTalkedToCount + salesCompletedCount;
+
   let progressPercentage = 0;
   if (clientTarget > 0) {
-    progressPercentage = (salesCompletedCount / clientTarget) * 100;
+    progressPercentage = (clientsReachedCount / clientTarget) * 100;
   }
   // You might also want a progress based on total clients contacted:
   const contactProgress = (totalClients / clientTarget) * 100;
@@ -168,10 +172,12 @@ const getGoalById = async (id: string) => {
   // Return the goal data WITH the calculated fields added
   return {
     ...goalData,
-    clientsReachedCount,
-    clientsTalkedToCount,
+    // clientsReachedCount,
+    // clientsTalkedToCount,
     salesCompletedCount,
     contactProgress,
+    totalReached,
+    totalTalkedTo,
     progressPercentage: Math.min(100, Math.round(progressPercentage)),
   };
 };
@@ -261,7 +267,7 @@ const getClientById = async (id: string) => {
       name: true,
       phone: true,
       notes: true,
-      status:true
+      status: true,
     },
   });
 };
