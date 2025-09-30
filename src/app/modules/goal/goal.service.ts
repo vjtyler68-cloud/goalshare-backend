@@ -84,12 +84,20 @@ const getMyGoals = async (userId: string, query: PaginationQuery) => {
 
   // Add report for reached clients
   const goalsWithReport = goals.map(goal => {
-    const reachedCount = goal.clients.filter(
-      c => c.status === 'REACHED',
+    const reachedCount = goal.clients
+      .filter(c => c.status === 'REACHED' || 'TALKED_TO' || 'COMPLETED')
+      .reduce((total, c) => total + c.timeSpent, 0);
+
+
+
+    // 1. Client Reached Count: Uses the new 'REACHED' status
+    const clientsReachedCount = goal.clients.filter(
+      client => client.status === 'REACHED',
     ).length;
     return {
       ...goal,
       reachedClientsTime: reachedCount,
+      clientsReachedCount,
     };
   });
 
