@@ -215,8 +215,8 @@ const hardDeleteUserIntoDB = async (id: string, adminId: string) => {
       await tx.motivation.deleteMany({ where: { userId: id } });
       await tx.notificationUser.deleteMany({ where: { userId: id } });
       await tx.vision.deleteMany({ where: { userId: id } });
-      await tx.community.deleteMany({ where: { userId: id } });
-      await tx.communityMembers.deleteMany({ where: { userId: id } });
+      // await tx.groupRoom.deleteMany({ where: { userId: id } });
+      // await tx.communityMembers.deleteMany({ where: { userId: id } });
       await tx.follow.deleteMany({
         where: {
           OR: [{ followerId: id }, { followingId: id }],

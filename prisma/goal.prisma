@@ -7,7 +7,7 @@ model Goal {
     priority       GoalPriority
     dueDate        DateTime
     status         GoalStatus   @default(PENDING)
-    breakTimeSpent DateTime?
+    breakTimeSpent Int        @default(0)
 
     userId String @db.ObjectId
     user   User   @relation(fields: [userId], references: [id])
@@ -27,8 +27,8 @@ model Client {
     name      String?
     phone     String?
     notes     String?
-    timeSpent DateTime?
-    //   timeSpent Int @default(0)
+    // timeSpent String?
+    timeSpent Int          @default(0)
     status    ClientStatus @default(PENDING)
 
     goalId String @db.ObjectId

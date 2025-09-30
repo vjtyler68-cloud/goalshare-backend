@@ -14,7 +14,7 @@ const followUser = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: `Successfully followed ${result.following.fullName}`,
+    message: `Successfully followed ${result?.following?.fullName}`,
     data: result,
   });
 });
@@ -28,7 +28,7 @@ const unfollowUser = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: `Successfully unfollowed ${result.following.fullName}`,
+    message: `Successfully unfollowed ${result?.following?.fullName}`,
     data: result,
   });
 });

@@ -1,65 +1,3 @@
-model Community {
-    id          String  @id @default(auto()) @map("_id") @db.ObjectId
-    userId      String? @db.ObjectId
-    name        String
-    description String
-    image       String?
-    isDeleted   Boolean @default(false)
-
-    user User? @relation(fields: [userId], references: [id])
-
-    users     CommunityMembers[]
-    communityMessages CommunityMessage[]
-    createdAt DateTime           @default(now())
-    updatedAt DateTime           @updatedAt
-
-    @@map("community")
-}
-
-model CommunityMembers {
-    id          String @id @default(auto()) @map("_id") @db.ObjectId
-    userId      String? @db.ObjectId
-    communityId String @db.ObjectId
-
-    isMuted Boolean @default(false)
-    isLeft  Boolean @default(false)
-
-    user      User?      @relation(fields: [userId], references: [id])
-    community Community @relation(fields: [communityId], references: [id])
-
-    @@map("community_members")
-}
-
-model CommunityMessage {
-    id            String   @id @default(auto()) @map("_id") @db.ObjectId
-    communityId   String   @db.ObjectId
-    senderId      String   @db.ObjectId
-    message       String
-    isRead        Boolean  @default(false)
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @updatedAt
-
-    // Relations
-    community     Community             @relation(fields: [communityId], references: [id])
-    sender        User                  @relation(fields: [senderId], references: [id])
-    readStatuses  CommunityMessageReadStatus[]
-
-    @@map("community_messages")
-}
-
-model CommunityMessageReadStatus {
-    id        String   @id @default(auto()) @map("_id") @db.ObjectId
-    messageId String   @db.ObjectId
-    userId    String   @db.ObjectId
-    readAt    DateTime @default(now())
-
-    message   CommunityMessage @relation(fields: [messageId], references: [id])
-    user      User             @relation(fields: [userId], references: [id])
-
-    @@unique([messageId, userId])
-    @@map("community_message_read_status")
-}
-
 model Room {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   senderId   String   @db.ObjectId
@@ -85,18 +23,22 @@ model Chat {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  //Relation
-  room Room @relation(fields: [roomId], references: [id])
+  // Relations (যোগ করো)
+  room     Room @relation(fields: [roomId], references: [id])
+  sender   User @relation("ChatSender", fields: [senderId], references: [id])
+  receiver User @relation("ChatReceiver", fields: [receiverId], references: [id])
 
   @@map("chats")
 }
 
 model GroupRoom {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  createdBy String   @db.ObjectId
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  image       String?
+  createdBy   String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   //Relations
   members GroupMember[]
@@ -116,6 +58,7 @@ model GroupMember {
   group GroupRoom @relation(fields: [groupId], references: [id])
   user  User      @relation(fields: [userId], references: [id])
 
+  @@unique([groupId, userId])
   @@map("groupMembers")
 }
 

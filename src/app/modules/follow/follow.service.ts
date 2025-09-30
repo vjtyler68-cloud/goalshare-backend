@@ -155,12 +155,12 @@ const getMyFollowerFollowingList = async (
     },
   });
 
-  const followers = followersList.map(f => f.follower);
-  const following = followingList.map(f => f.following);
+  const followers = followersList.map(f => f.follower).filter(Boolean);
+  const following = followingList.map(f => f.following).filter(Boolean);
 
   // Merge + remove duplicates
   const users = [...followers, ...following].filter(
-    (v, i, a) => a.findIndex(t => t.id === v.id) === i,
+    (v, i, a) => a.findIndex(t => t?.id === v?.id) === i,
   );
 
   return { users };

@@ -49,7 +49,6 @@ const getMyGoals = async (userId: string, query: PaginationQuery) => {
 
   const baseWhere = {
     userId,
-
     ...(categoryFilter && {
       category: categoryFilter as GoalCategory,
       priority: categoryFilter as GoalPriority,
@@ -74,7 +73,6 @@ const getMyGoals = async (userId: string, query: PaginationQuery) => {
       dueDate: true,
       status: true,
       breakTimeSpent: true,
-
       clients: {
         select: {
           status: true,
@@ -84,8 +82,19 @@ const getMyGoals = async (userId: string, query: PaginationQuery) => {
     },
   });
 
+  // Add report for reached clients
+  const goalsWithReport = goals.map(goal => {
+    const reachedCount = goal.clients.filter(
+      c => c.status === 'REACHED',
+    ).length;
+    return {
+      ...goal,
+      reachedClientsTime: reachedCount,
+    };
+  });
+
   return {
-    goals,
+    goals: goalsWithReport,
     pagination: {
       total,
       page,
@@ -167,7 +176,7 @@ const getGoalById = async (id: string) => {
     progressPercentage = (clientsReachedCount / clientTarget) * 100;
   }
   // You might also want a progress based on total clients contacted:
-  const contactProgress = (totalClients / clientTarget) * 100;
+  const contactProgress = (clientTarget / clientsReachedCount) * 100;
 
   // Return the goal data WITH the calculated fields added
   return {
@@ -198,7 +207,7 @@ const updateGoalStatus = async (
   return await prisma.goal.update({ where: { id }, data: { status } });
 };
 
-const goalBreakTimeSpent = async (goalId: string, breakTimeSpent: any) => {
+const goalBreakTimeSpent = async (goalId: string, breakTimeSpent: number) => {
   return await prisma.goal.update({
     where: { id: goalId },
     data: { breakTimeSpent },
@@ -295,7 +304,7 @@ const updateClientStatus = async (
   });
 };
 
-const updateClientTimeSpent = async (clientId: string, timeSpent: any) => {
+const updateClientTimeSpent = async (clientId: string, timeSpent: number) => {
   return await prisma.client.update({
     where: { id: clientId },
     data: { timeSpent },
