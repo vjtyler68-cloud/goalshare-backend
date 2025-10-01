@@ -7,7 +7,6 @@ import { SubscriptionRoutes } from '../modules/Subscription/Subscription.routes'
 import { MotivationRoutes } from '../modules/Motivation/Motivation.routes';
 import { VisionRoutes } from '../modules/Vision/Vision.routes';
 import { FollowRoutes } from '../modules/follow/follow.routes';
-import { CommunityRoutes } from '../modules/community/community.routes';
 import { MetaRoutes } from '../modules/meta/analytics.route';
 import { GoalRoutes } from '../modules/goal/goal.routes';
 import { BudgetRoutes } from '../modules/budget/budget.routes';
@@ -47,10 +46,6 @@ const moduleRoutes = [
   {
     path: '/follow',
     route: FollowRoutes,
-  },
-  {
-    path: '/community',
-    route: CommunityRoutes,
   },
   {
     path: '/meta',

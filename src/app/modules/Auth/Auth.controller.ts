@@ -38,6 +38,21 @@ const logoutUser = catchAsync(async (req, res) => {
   });
 });
 
+const firebaseLogin = catchAsync(async (req, res) => {
+  const payload = req.body;
+  const result = await AuthServices.createFirebaseLogin(payload);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Firebase login successful',
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+    },
+  });
+});
+
 const verifyEmailWithOtp = catchAsync(async (req, res) => {
   const result = await AuthServices.verifyEmailWithOtp(req.body);
 
@@ -111,4 +126,5 @@ export const AuthControllers = {
   forgetPassword,
   verifyForgotPassOtp,
   resetPassword,
+  firebaseLogin,
 };

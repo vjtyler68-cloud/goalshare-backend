@@ -18,6 +18,79 @@ import { generateToken } from '../../utils/generateToken';
 import { insecurePrisma, prisma } from '../../utils/prisma';
 import emailSender, { generateOtpEmail } from '../../utils/spainxOtp';
 
+const createFirebaseLogin = async (payload: User) => {
+  // Check if the user already exists
+  const userData = await prisma.user.findUnique({
+    where: {
+      email: payload.email,
+    },
+  });
+
+  if (!userData) {
+    // Create a new user if it doesn't exist
+    const newUser = await prisma.user.create({
+      data: {
+        fullName: payload.fullName || '',
+        profile:payload.profile || '', 
+        email: payload.email,
+        password: payload.password || '',
+        fcmToken: payload.fcmToken,
+        isEmailVerified: true,
+        isAgreeWithTerms: true,
+        status: UserStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        isEmailVerified: true,
+        status: true,
+      },
+    });
+
+    // Generate a JWT access token for the new user
+    const accessToken = await generateToken(
+      {
+        id: newUser.id,
+        name: newUser.fullName,
+        email: newUser.email,
+        role: newUser.role,
+      },
+      config.jwt.access_secret as Secret,
+      config.jwt.access_expires_in as SignOptions['expiresIn'],
+    );
+
+    return { user: newUser, accessToken };
+  }
+
+  // If the user exists, update the FCM token
+  const updatedUser = await prisma.user.update({
+    where: { email: payload.email },
+    data: {
+      fcmToken: payload.fcmToken,
+    },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      role: true,
+    },
+  });
+
+  const accessToken = await generateToken(
+    {
+      id: updatedUser.id,
+      name: updatedUser.fullName,
+      email: updatedUser.email,
+      role: updatedUser.role,
+    },
+    config.jwt.access_secret as Secret,
+    config.jwt.access_expires_in as SignOptions['expiresIn'],
+  );
+
+  return { user: updatedUser, accessToken };
+};
 const loginWithOtpFromDB = async (
   res: Response,
   payload: {
@@ -442,4 +515,5 @@ export const AuthServices = {
   forgetPassword,
   verifyForgotPassOtp,
   resetPassword,
+  createFirebaseLogin,
 };

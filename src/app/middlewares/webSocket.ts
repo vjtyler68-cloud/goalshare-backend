@@ -23,7 +23,7 @@ export async function setupWebSocket(server: Server) {
     ws.on('message', async (data: string) => {
       try {
         const parsedData = JSON.parse(data);
-        console.log('Received event:', parsedData.event, parsedData); 
+        console.log('Received event:', parsedData.event, parsedData);
 
         switch (parsedData.event) {
           case 'authenticate': {
@@ -630,7 +630,7 @@ export async function setupWebSocket(server: Server) {
 
           // Group Events (similar fixes)
           case 'createGroup': {
-            const { name, memberIds ,image} = parsedData;
+            const { name, memberIds, image, description } = parsedData;
             if (
               !ws.userId ||
               !name ||
@@ -639,6 +639,19 @@ export async function setupWebSocket(server: Server) {
             ) {
               ws.send(
                 JSON.stringify({ event: 'error', message: 'Invalid payload' }),
+              );
+              return;
+            }
+
+            if (
+              image &&
+              (typeof image !== 'string' || !image.startsWith('http'))
+            ) {
+              ws.send(
+                JSON.stringify({
+                  event: 'error',
+                  message: 'Invalid image URL',
+                }),
               );
               return;
             }
@@ -660,6 +673,8 @@ export async function setupWebSocket(server: Server) {
               data: {
                 name,
                 createdBy: ws.userId,
+                image: image || null,
+                description: description || '',
                 members: {
                   create: [
                     { userId: ws.userId, role: 'admin' },
@@ -669,7 +684,7 @@ export async function setupWebSocket(server: Server) {
               },
               include: { members: true },
             });
-            console.log('Group created:', group.id);
+            console.log('Group created:', group.id, 'with image:', group.image);
 
             const allMemberIds = [ws.userId, ...memberIds];
             allMemberIds.forEach(id => {
@@ -893,7 +908,7 @@ export async function setupWebSocket(server: Server) {
           }
 
           // FreeStyle variants (similar to main, copy if needed)
-          // ... (freeStyleFetchChats, freeStyleUnReadMessages – message-এর মতো কপি করো)
+          // ... (freeStyleFetchChats, freeStyleUnReadMessages )
 
           case 'project': {
             ws.send(JSON.stringify({ event: 'project', data: parsedData })); // Placeholder

@@ -17,6 +17,7 @@ router.post(
 
 router.post('/register', AuthControllers.registerWithOtp);
 router.post('/logout', AuthControllers.logoutUser);
+router.post('/firebase-login', AuthControllers.firebaseLogin);
 
 router.post(
   '/verify-email-with-otp',

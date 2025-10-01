@@ -17,6 +17,7 @@ model User {
 
   otp       String?
   otpExpiry DateTime?
+  fcmToken String?
 
   isEmailVerified Boolean @default(false)
   isApproved      Boolean @default(false)
@@ -66,3 +67,4 @@ enum UserStatus {
   ACTIVE
   SUSPENDED
 }
+

@@ -110,7 +110,7 @@ import { getWeek } from './report.constant';
  * @param {Date | null | undefined} timeSpent - The timeSpent DateTime
  * @returns {number} - Total hours as decimal (e.g., 8.5)
  */
-function convertToDecimalHours(timeSpent: Date | null | undefined): number {
+function convertToDecimalHours(timeSpent:number| null | undefined): number {
   if (!timeSpent) return 0;
 
   const dateObj = new Date(timeSpent);
@@ -128,7 +128,7 @@ function convertToDecimalHours(timeSpent: Date | null | undefined): number {
  * @param {Date | null | undefined} timeSpent
  * @returns {string} - Formatted time string (e.g., "8h 30m")
  */
-function formatTimeSpent(timeSpent: Date | null | undefined): string {
+function formatTimeSpent(timeSpent: number | null | undefined): string {
   if (!timeSpent) return '0h 0m';
 
   const dateObj = new Date(timeSpent);
