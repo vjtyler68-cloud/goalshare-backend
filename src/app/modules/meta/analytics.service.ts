@@ -90,13 +90,13 @@ const getReportTableData = async (
         gte: new Date(startDate),
         lte: new Date(endDate),
       },
-      status: PaymentStatus.SUCCESS,  
+      status: PaymentStatus.SUCCESS,
     },
     select: {
       createdAt: true,
       user: {
         select: {
-          fullName: true, 
+          fullName: true,
         },
       },
       amount: true,
@@ -109,9 +109,9 @@ const getReportTableData = async (
   // Map the data to match the table structure (Date, Type, User, Amount)
   const reportData = payments.map(payment => ({
     date: payment.createdAt.toISOString().split('T')[0],
-    type: 'Monthly', 
-    user: payment.user.fullName || 'Unknown', 
-    amount: payment.amount || 0, 
+    type: 'Monthly',
+    user: payment.user.fullName || 'Unknown',
+    amount: payment.amount || 0,
   }));
 
   return reportData;

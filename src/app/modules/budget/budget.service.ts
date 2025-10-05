@@ -1,28 +1,23 @@
-import AppError from '../../errors/AppError';
-import { prisma } from '../../utils/prisma'; // Assuming this path is correct
-import httpStatus from 'http-status';
 
-// Helper function to calculate totals and percentages (NO CHANGE HERE)
+import { prisma } from '../../utils/prisma';
+
+// ================= HELPER =================
 const calculateBudgetSummary = (budget: any) => {
-  // Calculate total income
   const totalIncome = budget.incomeSources.reduce(
     (sum: number, item: { amount: number }) => sum + item.amount,
     0,
   );
 
-  // Calculate total expense target (the total amount planned to spend)
   const totalExpenseTarget = budget.expenseItems.reduce(
     (sum: number, item: { totalAmount: number }) => sum + item.totalAmount,
     0,
   );
 
-  // Calculate total actual spent amount
   const totalSpent = budget.expenseItems.reduce(
     (sum: number, item: { spentAmount: number }) => sum + item.spentAmount,
     0,
   );
 
-  // Calculate percentage spent based on total expense target
   const expensePercentage =
     totalExpenseTarget > 0
       ? Math.min(100, Math.round((totalSpent / totalExpenseTarget) * 100))
@@ -37,7 +32,9 @@ const calculateBudgetSummary = (budget: any) => {
   };
 };
 
-// 1. Get Budget with all details and calculated summary (NO CHANGE HERE, as it needs all data for calculation)
+// ================= SERVICES =================
+
+// 1. Get Budget by user
 const getBudgetByUserId = async (userId: string) => {
   const budgetData = await prisma.budget.findFirst({
     where: { userId },
@@ -46,14 +43,7 @@ const getBudgetByUserId = async (userId: string) => {
       targetAmount: true,
       month: true,
       year: true,
-
-      incomeSources: {
-        select: {
-          id: true,
-          name: true,
-          amount: true,
-        },
-      },
+      incomeSources: { select: { id: true, name: true, amount: true } },
       expenseItems: {
         select: {
           id: true,
@@ -67,50 +57,56 @@ const getBudgetByUserId = async (userId: string) => {
   });
 
   if (!budgetData) return null;
-
   return calculateBudgetSummary(budgetData);
 };
 
-// 2. Create or Update the main budget target amount (MODIFIED)
+// 2. Create or Update Budget
 const createOrUpdateBudget = async (userId: string, targetAmount: number) => {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
   const existingBudget = await prisma.budget.findFirst({
-    where: {
-      userId: userId,
-      month: currentMonth,
-      year: currentYear,
-    },
+    where: { userId, month: currentMonth, year: currentYear },
   });
 
-  const newBudget = await prisma.budget.create({
-    data: {
-      userId,
-      targetAmount,
-      month: currentMonth,
-      year: currentYear,
-    },
-  });
+  if (existingBudget) {
+    return await prisma.budget.update({
+      where: { id: existingBudget.id },
+      data: { targetAmount },
+    });
+  }
 
-  return newBudget;
+  return await prisma.budget.create({
+    data: { userId, targetAmount, month: currentMonth, year: currentYear },
+  });
 };
 
-// 3. Add a new income source (MODIFIED)
-const addIncome = async (budgetId: string, name: string, amount: number) => {
+// 3. Create or Update Income
+const addOrUpdateIncome = async (
+  budgetId: string,
+  name: string,
+  amount: number,
+) => {
+  const existingIncome = await prisma.incomeSource.findFirst({
+    where: { budgetId, name },
+  });
+
+  if (existingIncome) {
+    return await prisma.incomeSource.update({
+      where: { id: existingIncome.id },
+      data: { amount },
+      select: { id: true, name: true, amount: true, budgetId: true },
+    });
+  }
+
   return await prisma.incomeSource.create({
     data: { budgetId, name, amount },
-    select: {
-      id: true,
-      name: true,
-      amount: true,
-      budgetId: true,
-    },
+    select: { id: true, name: true, amount: true, budgetId: true },
   });
 };
 
-// 4. Add a new expense item (MODIFIED)
+// 4. Create or Update Expense
 const addExpense = async (
   budgetId: string,
   name: string,
@@ -128,7 +124,7 @@ const addExpense = async (
   });
 };
 
-// 5. Update the 'spentAmount' for an expense item (MODIFIED)
+// 5. Update Spent Amount
 const updateExpenseSpentAmount = async (
   expenseItemId: string,
   spentAmount: number,
@@ -136,18 +132,14 @@ const updateExpenseSpentAmount = async (
   return await prisma.expenseItem.update({
     where: { id: expenseItemId },
     data: { spentAmount },
-    select: {
-      id: true,
-      spentAmount: true,
-      budgetId: true,
-    },
+    select: { id: true, spentAmount: true, budgetId: true },
   });
 };
 
 export const BudgetServices = {
   getBudgetByUserId,
   createOrUpdateBudget,
-  addIncome,
+  addOrUpdateIncome,
   addExpense,
   updateExpenseSpentAmount,
 };

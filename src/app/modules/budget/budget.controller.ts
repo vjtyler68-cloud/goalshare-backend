@@ -10,7 +10,6 @@ const getMyBudget = catchAsync(async (req: Request, res: Response) => {
   const result = await BudgetServices.getBudgetByUserId(userId);
 
   if (!result) {
-    // If budget doesn't exist, return a response indicating it's not set up yet
     return sendResponse(res, {
       statusCode: httpStatus.NOT_FOUND,
       success: true,
@@ -53,7 +52,7 @@ const updateBudgetTarget = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// POST /api/budget/:budgetId/income - Adds a new income source
+// POST /api/budget/:budgetId/income - Adds or updates an income source
 const addIncomeSource = catchAsync(async (req: Request, res: Response) => {
   const { budgetId } = req.params;
   const { name, amount } = req.body;
@@ -67,16 +66,16 @@ const addIncomeSource = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  const result = await BudgetServices.addIncome(budgetId, name, amount);
+  const result = await BudgetServices.addOrUpdateIncome(budgetId, name, amount);
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
-    message: 'Successfully added income source.',
+    message: 'Successfully added/updated income source.',
     data: result,
   });
 });
 
-// POST /api/budget/:budgetId/expense - Adds a new expense item
+// POST /api/budget/:budgetId/expense - Adds or updates an expense item
 const addExpenseItem = catchAsync(async (req: Request, res: Response) => {
   const { budgetId } = req.params;
   const { name, totalAmount } = req.body;
@@ -90,11 +89,15 @@ const addExpenseItem = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  const result = await BudgetServices.addExpense(budgetId, name, totalAmount);
+  const result = await BudgetServices.addExpense(
+    budgetId,
+    name,
+    totalAmount,
+  );
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
-    message: 'Successfully added expense item.',
+    message: 'Successfully added/updated expense item.',
     data: result,
   });
 });
@@ -125,7 +128,6 @@ const updateSpent = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Exporting the functions needed for the routes, using aliases to match the previous response
 export const BudgetController = {
   getMyBudget,
   updateBudgetTarget,

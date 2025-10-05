@@ -10,7 +10,11 @@ router.get(
   auth(UserRoleEnum.ADMIN),
   MetaController.fetchDashboardMetaData,
 );
-router.get('/report-table-data',auth(UserRoleEnum.ADMIN), MetaController.getReportTableData);
+router.get(
+  '/report-table-data',
+  auth(UserRoleEnum.ADMIN),
+  MetaController.getReportTableData,
+);
 router.get('/user', auth(UserRoleEnum.USER), ReportController.getUserReports);
 
 export const MetaRoutes = router;

@@ -110,7 +110,7 @@ import { getWeek } from './report.constant';
  * @param {Date | null | undefined} timeSpent - The timeSpent DateTime
  * @returns {number} - Total hours as decimal (e.g., 8.5)
  */
-function convertToDecimalHours(timeSpent:number| null | undefined): number {
+function convertToDecimalHours(timeSpent: number | null | undefined): number {
   if (!timeSpent) return 0;
 
   const dateObj = new Date(timeSpent);
@@ -221,14 +221,14 @@ const fetchUserReports = async (userId: string) => {
     ...activity,
     timeSpentDecimal: convertToDecimalHours(activity.timeSpent),
     timeSpentFormatted: formatTimeSpent(activity.timeSpent),
-    timeSpent: activity.timeSpent, 
+    timeSpent: activity.timeSpent,
   }));
 
   return {
     progress: {
       salesPercent,
       totalClients,
-      totalTimeSpent: Math.round(totalTimeSpent * 10) / 10, 
+      totalTimeSpent: Math.round(totalTimeSpent * 10) / 10,
     },
     goalTrend: goalsTrend,
     categoryDistribution,

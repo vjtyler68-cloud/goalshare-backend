@@ -88,16 +88,26 @@ const getMyGoals = async (userId: string, query: PaginationQuery) => {
       .filter(c => c.status === 'REACHED' || 'TALKED_TO' || 'COMPLETED')
       .reduce((total, c) => total + c.timeSpent, 0);
 
-
-
-    // 1. Client Reached Count: Uses the new 'REACHED' status
     const clientsReachedCount = goal.clients.filter(
       client => client.status === 'REACHED',
     ).length;
+
+    // 2. Client Talked To Count: Uses the new 'TALKED_TO' status
+    const clientsTalkedToCount = goal.clients.filter(
+      client => client.status === 'TALKED_TO',
+    ).length;
+
+    // 3. Sales Completed Count: Uses your 'COMPLETED' status (Final step)
+    const salesCompletedCount = goal.clients.filter(
+      client => client.status === 'COMPLETED',
+    ).length;
+    const totalReached =
+      clientsReachedCount + clientsTalkedToCount + salesCompletedCount;
+
     return {
       ...goal,
       reachedClientsTime: reachedCount,
-      clientsReachedCount,
+      totalReached,
     };
   });
 
