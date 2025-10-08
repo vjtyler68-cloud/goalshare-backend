@@ -1,10 +1,11 @@
 model User {
-  id          String       @id @default(auto()) @map("_id") @db.ObjectId
-  fullName    String
-  email       String       @unique
-  phoneNumber String?      @unique
-  password    String
-  role        UserRoleEnum @default(USER)
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  fullName     String
+  businessType String?
+  email        String       @unique
+  phoneNumber  String?      @unique
+  password     String
+  role         UserRoleEnum @default(USER)
 
   status UserStatus @default(ACTIVE)
 
@@ -17,7 +18,7 @@ model User {
 
   otp       String?
   otpExpiry DateTime?
-  fcmToken String?
+  fcmToken  String?
 
   isEmailVerified Boolean @default(false)
   isApproved      Boolean @default(false)
@@ -30,29 +31,29 @@ model User {
   subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
   stripeCustomerId  String?
 
-  payments         Payment[]
-  motivation       Motivation[]
-  notifications    NotificationUser[]
-  vision           Vision[]
+  payments      Payment[]
+  motivation    Motivation[]
+  notifications NotificationUser[]
+  vision        Vision[]
   // communityMembers CommunityMembers[]
 
-  followers Follow[]    @relation("Followers")
-  following Follow[]    @relation("Following")
+  followers Follow[] @relation("Followers")
+  following Follow[] @relation("Following")
   // community Community[]
   goal      Goal[]
   budget    Budget[]
 
   // communityMessage           CommunityMessage[]
   // communityMessageReadStatus CommunityMessageReadStatus[]
-  room                       Room[]                       @relation("RoomSender")
-  Room                       Room[]                       @relation("RoomReceiver")
-  groupMember                GroupMember[]
-  groupChat                  GroupChat[]
-  groupChatReadStatus        GroupChatReadStatus[]
+  room                Room[]                @relation("RoomSender")
+  Room                Room[]                @relation("RoomReceiver")
+  groupMember         GroupMember[]
+  groupChat           GroupChat[]
+  groupChatReadStatus GroupChatReadStatus[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  chat       Chat[]   @relation("ChatReceiver")
+  chat      Chat[]   @relation("ChatReceiver")
   Chat      Chat[]   @relation("ChatSender")
 
   @@map("users")
@@ -67,4 +68,3 @@ enum UserStatus {
   ACTIVE
   SUSPENDED
 }
-

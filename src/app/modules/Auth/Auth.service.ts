@@ -356,12 +356,16 @@ const resendVerificationWithOtp = async (email: string) => {
 };
 
 const changePassword = async (user: any, payload: any) => {
-  const userData = await insecurePrisma.user.findUniqueOrThrow({
+  const userData = await insecurePrisma.user.findUnique({
     where: {
       email: user.email,
       status: 'ACTIVE',
     },
   });
+
+  if(!userData){
+    throw new AppError(401,'User not found')
+  }
 
   const isCorrectPassword: boolean = await bcrypt.compare(
     payload.oldPassword,

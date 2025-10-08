@@ -4,7 +4,6 @@ import { prisma } from '../../utils/prisma';
 import { PaymentStatus, SubscriptionType } from '@prisma/client';
 import AppError from '../../errors/AppError';
 import { stripe } from '../../utils/stripe';
-import config from '../../../config';
 import Stripe from 'stripe';
 
 // Create Subscription
@@ -61,15 +60,11 @@ const createIntoDb = async (req: Request) => {
 };
 
 // Get All Subscription (Optional Filtering)
-const getAllSubscription = async (query: Record<string, any>) => {
-  const { subscriptionType } = query;
-
+const getAllSubscription = async () => {
   const subscriptions = await prisma.subscription.findMany({
-    where: subscriptionType
-      ? {
-          subscriptionType: subscriptionType as any,
-        }
-      : {},
+    where: {
+      isActive: true,
+    },
     orderBy: {
       createdAt: 'desc',
     },
@@ -284,13 +279,12 @@ const assignSubscriptionToUser = async (userId: string, payload: any) => {
 // Get Subscription by ID
 
 const getMySubscription = async (userId: string) => {
-
   const userWithSubscription = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       subscription: {
         select: {
-          id:true,
+          id: true,
           title: true,
           price: true,
           duration: true,
@@ -387,8 +381,9 @@ const updateIntoDb = async (id: string, data: Partial<any>) => {
 
 // Hard Delete Subscription
 const deleteIntoDb = async (id: string) => {
-  const subscription = await prisma.subscription.delete({
+  const subscription = await prisma.subscription.update({
     where: { id },
+    data: { isActive: false },
   });
 
   return subscription;

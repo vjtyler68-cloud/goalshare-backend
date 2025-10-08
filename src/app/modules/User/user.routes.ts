@@ -1,7 +1,6 @@
 import express from 'express';
 import auth from '../../middlewares/auth';
 import { UserControllers } from './user.controller';
-import { parseBody } from '../../middlewares/parseBody';
 import validateRequest from '../../middlewares/validateRequest';
 import { userValidation } from './user.validation';
 import { upload } from '../../utils/fileUploader';
@@ -11,8 +10,14 @@ const router = express.Router();
 
 router.get(
   '/',
-  auth((UserRoleEnum.ADMIN, UserRoleEnum.USER)),
+  auth(UserRoleEnum.ADMIN, UserRoleEnum.USER),
   UserControllers.getAllUsers,
+);
+
+router.get(
+  '/unapproved-users',
+  auth(UserRoleEnum.ADMIN),
+  UserControllers.getUnapprovedUsers,
 );
 router.get(
   '/me',
@@ -30,16 +35,9 @@ router.delete(
 
 router.put(
   '/update-profile',
-  auth('ANY'),
-  parseBody,
-  UserControllers.updateMyProfile,
-);
-
-router.put(
-  '/update-profile-image',
-  auth('ANY'),
+  auth(UserRoleEnum.ADMIN, UserRoleEnum.USER),
   upload.single('file'),
-  UserControllers.updateProfileImage,
+  UserControllers.updateMyProfile,
 );
 
 router.put(
@@ -59,6 +57,14 @@ router.put(
   '/approve-user',
   auth(UserRoleEnum.ADMIN),
   UserControllers.updateUserApproval,
+);
+
+router.put(
+  '/update-user/:id',
+  upload.single('file'),
+  // auth(UserRoleEnum.ADMIN),
+  validateRequest.body(userValidation.updateUser),
+  UserControllers.updateUser,
 );
 
 export const UserRouters = router;

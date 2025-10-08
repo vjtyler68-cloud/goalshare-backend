@@ -14,6 +14,22 @@ const getAllUsers = catchAsync(async (req, res) => {
   });
 });
 
+const getUnapprovedUsers = catchAsync(async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+  const pageNum = parseInt(page as string, 10);
+  const limitNum = parseInt(limit as string, 10);
+
+  const result = await UserServices.getAllUnApproveUser(pageNum, limitNum);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Unapproved users fetched successfully',
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
 const getMyProfile = catchAsync(async (req, res) => {
   const id = req.user.id;
   const result = await UserServices.getMyProfileFromDB(id);
@@ -36,36 +52,16 @@ const getUserDetails = catchAsync(async (req, res) => {
   });
 });
 
-// Update profile fields
-const updateMyProfile = catchAsync(async (req: Request, res) => {
-  const id = req.user.id;
-  const payload = req.body;
-
-  const result = await UserServices.updateMyProfileIntoDB(id, payload);
-
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    message: 'User profile updated successfully',
-    data: result,
-  });
-});
-
-// Update profile image
-const updateProfileImage = catchAsync(async (req: Request, res) => {
+const updateMyProfile = catchAsync(async (req, res) => {
   const id = req.user.id;
   const file = req.file;
-  const previousImg = req.user.profile || '';
-
-  const result = await UserServices.updateProfileImg(
-    id,
-    previousImg,
-    req,
-    file,
-  );
+  const payload = JSON.parse(req.body.data);
+  const result = await UserServices.updateMyProfileIntoDB(id, file, payload);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
-    message: 'Profile image updated successfully',
+    success: true,
+    message: 'Profile updated successfully',
     data: result,
   });
 });
@@ -126,15 +122,27 @@ const hardDeleteUser = catchAsync(async (req, res) => {
   });
 });
 
+const updateUser = catchAsync(async (req, res) => {
+  const id = req.params.id;
+  const result = await UserServices.updateUserIntoDb(req, id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'User updated successfully!',
+    data: result,
+  });
+});
+
 export const UserControllers = {
   getAllUsers,
   getMyProfile,
   getUserDetails,
   updateMyProfile,
-  updateProfileImage,
+  getUnapprovedUsers,
   updateUserRoleStatus,
   updateUserStatus,
   updateUserApproval,
   softDeleteUser,
   hardDeleteUser,
+  updateUser,
 };

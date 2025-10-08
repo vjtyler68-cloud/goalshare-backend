@@ -15,7 +15,7 @@ const createIntoDb = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllSubscription = catchAsync(async (req: Request, res: Response) => {
-  const result = await SubscriptionServices.getAllSubscription(req.query);
+  const result = await SubscriptionServices.getAllSubscription();
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
