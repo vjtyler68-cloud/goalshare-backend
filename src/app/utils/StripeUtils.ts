@@ -105,7 +105,7 @@ const StripeHook = async (
           }
 
           await prisma.user.update({
-            where: { id: existingPayment.userId },
+            where: { id: existingPayment.userId as string },
             data: {
               subscriptionStart: startDate,
               subscriptionEnd: endDate,
@@ -116,7 +116,7 @@ const StripeHook = async (
 
           // 4. Update the Payment record status (Now existingPayment.id is available)
           await prisma.payment.update({
-            where: { id: existingPayment.id }, // No more error here!
+            where: { id: existingPayment.id },
             data: {
               status: PaymentStatus.SUCCESS,
               amount: invoice.amount_paid / 100,

@@ -73,9 +73,10 @@ const fetchDashboardMetaData = async (userId: string) => {
 
 const getReportTableData = async (
   userId: string,
-  // startDate: string,
-  // endDate: string,
+  startDate?: string,
+  endDate?: string,
 ) => {
+  // Check if user is ADMIN
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { role: true },
@@ -85,13 +86,38 @@ const getReportTableData = async (
     throw new AppError(401, 'Unauthorized access');
   }
 
-  const payments = await prisma.payment.findMany();
+  // Build optional date filter
+  const dateFilter: any = {};
+  if (startDate) {
+    const start = new Date(startDate);
+    if (!isNaN(start.getTime())) dateFilter.gte = start;
+  }
+  if (endDate) {
+    const end = new Date(endDate);
+    if (!isNaN(end.getTime())) dateFilter.lte = end;
+  }
 
-  // Map the data to match the table structure (Date, Type, User, Amount)
+ const payments = await prisma.payment.findMany({
+   where: {
+     status: PaymentStatus.SUCCESS,
+     userId: { not: null },
+     ...(Object.keys(dateFilter).length && { createdAt: dateFilter }),
+   },
+   select: {
+     createdAt: true,
+     user: {
+       select: { fullName: true },
+     },
+     amount: true,
+   },
+   orderBy: { createdAt: 'asc' },
+ });
+
+  // Map the data to table structure
   const reportData = payments.map(payment => ({
     date: payment.createdAt.toISOString().split('T')[0],
     type: 'Monthly',
-    user: 'Unknown',
+    user: payment.user?.fullName || 'Unknown',
     amount: payment.amount || 0,
   }));
 
