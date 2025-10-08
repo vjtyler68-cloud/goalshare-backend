@@ -1,5 +1,6 @@
 import { PaymentStatus, UserRoleEnum, UserStatus } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
+import AppError from '../../errors/AppError';
 
 const fetchDashboardMetaData = async (userId: string) => {
   // First, get the current user's role to ensure they are an ADMIN
@@ -72,8 +73,8 @@ const fetchDashboardMetaData = async (userId: string) => {
 
 const getReportTableData = async (
   userId: string,
-  startDate: string,
-  endDate: string,
+  // startDate: string,
+  // endDate: string,
 ) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -81,36 +82,16 @@ const getReportTableData = async (
   });
 
   if (user?.role !== 'ADMIN') {
-    throw new Error('Unauthorized access');
+    throw new AppError(401, 'Unauthorized access');
   }
 
-  const payments = await prisma.payment.findMany({
-    where: {
-      createdAt: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      },
-      status: PaymentStatus.SUCCESS,
-    },
-    select: {
-      createdAt: true,
-      user: {
-        select: {
-          fullName: true,
-        },
-      },
-      amount: true,
-    },
-    orderBy: {
-      createdAt: 'asc',
-    },
-  });
+  const payments = await prisma.payment.findMany();
 
   // Map the data to match the table structure (Date, Type, User, Amount)
   const reportData = payments.map(payment => ({
     date: payment.createdAt.toISOString().split('T')[0],
     type: 'Monthly',
-    user: payment.user.fullName || 'Unknown',
+    user: 'Unknown',
     amount: payment.amount || 0,
   }));
 
