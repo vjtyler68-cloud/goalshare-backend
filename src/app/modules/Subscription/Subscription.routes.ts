@@ -15,11 +15,7 @@ router.get(
 );
 router.get('/:id', SubscriptionController.getSubscriptionById);
 //user-select subscription
-router.post(
-  '/assign',
-  auth(),
-  SubscriptionController.assignSubscription,
-);
+router.post('/assign', auth(), SubscriptionController.assignSubscription);
 // admin create subscription
 router.post('/', auth(UserRoleEnum.ADMIN), SubscriptionController.createIntoDb);
 router.put(

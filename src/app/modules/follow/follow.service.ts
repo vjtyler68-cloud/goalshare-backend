@@ -44,7 +44,11 @@ const unfollowUser = async (followerId: string, followingId: string) => {
 const getFollowers = async (userId: string) => {
   const followers = await prisma.follow.findMany({
     where: { followingId: userId },
-    include: { follower: { select: { id: true, fullName: true } } },
+    include: {
+      follower: {
+        select: { id: true, fullName: true, profile: true, email: true },
+      },
+    },
   });
   return followers.map(f => f.follower);
 };
@@ -52,10 +56,15 @@ const getFollowers = async (userId: string) => {
 const getFollowing = async (userId: string) => {
   const following = await prisma.follow.findMany({
     where: { followerId: userId },
-    include: { following: { select: { id: true, fullName: true } } },
+    include: {
+      following: {
+        select: { id: true, fullName: true, profile: true, email: true },
+      },
+    },
   });
   return following.map(f => f.following);
 };
+
 const getFollowCounts = async (userId: string) => {
   // Followers count
   const followersCount = await prisma.follow.count({

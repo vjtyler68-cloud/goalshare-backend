@@ -31,7 +31,7 @@ const createFirebaseLogin = async (payload: User) => {
     const newUser = await prisma.user.create({
       data: {
         fullName: payload.fullName || '',
-        profile:payload.profile || '', 
+        profile: payload.profile || '',
         email: payload.email,
         password: payload.password || '',
         fcmToken: payload.fcmToken,
@@ -145,6 +145,8 @@ const loginWithOtpFromDB = async (
       name: userData.fullName,
       email: userData.email,
       role: userData.role,
+      isApproved: userData.isApproved,
+      isDeleted: userData.isDeleted,
       accessToken: accessToken,
     };
   }
@@ -363,8 +365,8 @@ const changePassword = async (user: any, payload: any) => {
     },
   });
 
-  if(!userData){
-    throw new AppError(401,'User not found')
+  if (!userData) {
+    throw new AppError(401, 'User not found');
   }
 
   const isCorrectPassword: boolean = await bcrypt.compare(
