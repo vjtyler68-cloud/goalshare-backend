@@ -7,7 +7,7 @@ const createIntoDb = async (
   file: Express.Multer.File | undefined,
   year: string,
 ) => {
-  await prisma.user.findUniqueOrThrow({
+  await prisma.user.findUnique({
     where: { id },
   });
 
@@ -71,7 +71,7 @@ const updateIntoDb = async (
   data: Partial<{ year: string }>,
   file?: Express.Multer.File,
 ) => {
-  await prisma.vision.findUniqueOrThrow({ where: { id } });
+  await prisma.vision.findUnique({ where: { id } });
 
   let fileUrl: string | undefined;
   if (file) {

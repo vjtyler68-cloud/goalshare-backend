@@ -1,7 +1,7 @@
 import { createServer, Server as HTTPServer } from 'http';
 import app from './app';
 import config from './config';
-import seedSuperAdmin from './app/DB';
+// import seedSuperAdmin from './app/DB';
 import { setupWebSocket } from './app/middlewares/webSocket';
 
 const port = config.port || 5000;

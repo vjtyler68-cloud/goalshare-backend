@@ -11,6 +11,7 @@ import { upload } from './app/utils/fileUploader';
 import { uploadToDigitalOceanAWS } from './app/utils/uploadToDigitalOceanAWS';
 import catchAsync from './app/utils/catchAsync';
 import AppError from './app/errors/AppError';
+import { uploadToCloudinary } from './app/utils/uploadToCloudinary';
 const app: Application = express();
 
 app.post(
@@ -26,6 +27,7 @@ app.use(
       'http://localhost:3000',
       'https://spanx-neworld-dashbaord.vercel.app',
     ],
+    // methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
@@ -88,7 +90,8 @@ router.post(
     }
     const file = req.file;
 
-    const location = await uploadToDigitalOceanAWS(file); 
+    // const location = await uploadToDigitalOceanAWS(file); 
+    const location = await uploadToCloudinary(file); 
     const imageUrl = location.Location; 
 
     res.status(httpStatus.OK).json({ success: true, imageUrl }); 

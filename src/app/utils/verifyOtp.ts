@@ -3,7 +3,7 @@ import AppError from '../errors/AppError';
 import { prisma } from './prisma';
 
 export const verifyOtp = async (payload: { email: string; otp: string }) => {
-  const userData = await prisma.user.findFirstOrThrow({
+  const userData = await prisma.user.findFirst({
     where: {
       email: payload.email,
     },
@@ -16,6 +16,10 @@ export const verifyOtp = async (payload: { email: string; otp: string }) => {
       role: true,
     },
   });
+
+  if (!userData) {
+    throw new AppError(401, 'User not found');
+  }
 
   if (!userData.otp || !userData.otpExpiry) {
     throw new AppError(

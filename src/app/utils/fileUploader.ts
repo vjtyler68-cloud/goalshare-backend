@@ -19,6 +19,7 @@ const uploadMultiple = upload.fields([
   { name: 'multipleImage', maxCount: 10 },
 ]);
 
+
 export const fileUploader = {
   upload,
   uploadSingle,

@@ -341,6 +341,20 @@ const getMySubscription = async (userId: string) => {
     );
   }
 
+  // if (remainingDays === 0) {
+  //   await prisma.user.update({
+  //     where: { id: userId },
+  //     data: {
+  //       subscriptionId: null,
+  //       subscriptionStart: null,
+  //       subscriptionEnd: null,
+  //     },
+  //   });
+  //   return {
+  //     message: 'Subscription expired. Data reset successfully.',
+  //   };
+  // }
+
   return {
     subscription: {
       id: sub.id,
@@ -354,6 +368,111 @@ const getMySubscription = async (userId: string) => {
   };
 };
 
+// const getMySubscription = async (userId: string) => {
+//   const userWithSubscription = await prisma.user.findUnique({
+//     where: { id: userId },
+//     include: {
+//       subscription: {
+//         select: {
+//           id: true,
+//           title: true,
+//           price: true,
+//           duration: true,
+//           subscriptionType: true,
+//         },
+//       },
+//       payments: {
+//         where: {
+//           status: PaymentStatus.SUCCESS,
+//         },
+//         orderBy: {
+//           createdAt: 'desc',
+//         },
+//       },
+//     },
+//   });
+
+//   if (!userWithSubscription || !userWithSubscription.subscription) {
+//     return null;
+//   }
+
+//   const sub = userWithSubscription.subscription;
+//   const now = new Date();
+
+//    check free plan validity
+//   if (sub.subscriptionType === SubscriptionType.FREE) {
+//     const hasSuccessfulPayment = userWithSubscription.payments.some(
+//       payment => payment.subscriptionId === sub.id,
+//     );
+
+//     if (
+//       !userWithSubscription.subscriptionStart ||
+//       !userWithSubscription.subscriptionEnd ||
+//       !hasSuccessfulPayment
+//     ) {
+//       return null;
+//     }
+//   }
+
+//   let startDate = userWithSubscription.subscriptionStart;
+//   let endDate = userWithSubscription.subscriptionEnd;
+//   let remainingDays = 0;
+
+//   if (!startDate) {
+//     startDate = now;
+//   }
+
+//   if (!endDate) {
+//     if (sub.subscriptionType === SubscriptionType.MONTHLY) {
+//       endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+//     } else if (sub.subscriptionType === SubscriptionType.YEARLY) {
+  
+//       endDate = new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
+//     } else if (sub.subscriptionType === SubscriptionType.FREE) {
+ 
+//       endDate = new Date(
+//         startDate.getTime() + sub.duration * 24 * 60 * 60 * 1000,
+//       );
+//     }
+//   }
+
+// if (!endDate) {
+//   throw new Error('endDate is undefined');
+// }
+
+// remainingDays = Math.max(
+//   Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+//   0,
+// );
+
+//   if (remainingDays === 0) {
+//     await prisma.user.update({
+//       where: { id: userId },
+//       data: {
+//         subscriptionId: null,
+//         subscriptionStart: null,
+//         subscriptionEnd: null,
+//       },
+//     });
+//     return {
+//       message: 'Subscription expired. Data reset successfully.',
+//     };
+//   }
+
+//   return {
+//     subscription: {
+//       id: sub.id,
+//       title: sub.title,
+//       type: sub.subscriptionType,
+//       duration: sub.duration,
+//       startDate,
+//       endDate,
+//       remainingDays,
+//     },
+//   };
+// };
+
+
 const getSubscriptionByIdFromDB = async (id: string) => {
   const subscription = await prisma.subscription.findUnique({
     where: { id },
@@ -362,17 +481,87 @@ const getSubscriptionByIdFromDB = async (id: string) => {
   return subscription;
 };
 
-// Update Subscription
+// // Update Subscription
+// const updateIntoDb = async (id: string, data: Partial<any>) => {
+//   const subscription = await prisma.subscription.update({
+//     where: { id },
+//     data: {
+//       ...(data.title && { title: data.title }),
+//       ...(data.price && { price: parseFloat(data.price) }),
+//       ...(data.subscriptionType && {
+//         subscriptionType: data.subscriptionType,
+//       }),
+//       ...(data.duration && { duration: data.duration }),
+//     },
+//   });
+
+//   return subscription;
+// };
+
 const updateIntoDb = async (id: string, data: Partial<any>) => {
+  const existing = await prisma.subscription.findUnique({
+    where: { id },
+  });
+
+  if (!existing) {
+    throw new AppError(404, 'Subscription not found');
+  }
+
+  const title = data.title || existing.title;
+  const price = data.price ? parseFloat(data.price) : existing.price;
+  const subscriptionType = data.subscriptionType || existing.subscriptionType;
+  const duration =
+    data.duration !== undefined ? data.duration : existing.duration;
+
+  let stripePriceId: string | null = existing.stripePriceId;
+  let stripeProductId: string | null = existing.stripeProductId;
+
+  // Handle Stripe updates for paid subscriptions (create new product and price)
+  if (
+    subscriptionType === SubscriptionType.MONTHLY ||
+    subscriptionType === SubscriptionType.YEARLY
+  ) {
+    if (!price || price <= 0) {
+      throw new AppError(
+        400,
+        'Price must be greater than 0 for paid subscriptions',
+      );
+    }
+
+    // Create new Stripe Product
+    const product = await stripe.products.create({
+      name: title,
+      description: subscriptionType,
+      active: true,
+    });
+
+    // Create new Stripe Price
+    const stripePrice = await stripe.prices.create({
+      product: product.id,
+      unit_amount: Math.round(price * 100),
+      currency: 'usd',
+      recurring: {
+        interval:
+          subscriptionType === SubscriptionType.MONTHLY ? 'month' : 'year',
+      },
+    });
+
+    stripeProductId = product.id;
+    stripePriceId = stripePrice.id;
+  } else {
+    stripePriceId = null;
+    stripeProductId = null;
+  }
+
   const subscription = await prisma.subscription.update({
     where: { id },
     data: {
-      ...(data.title && { title: data.title }),
-      ...(data.price && { price: parseFloat(data.price) }),
-      ...(data.subscriptionType && {
-        subscriptionType: data.subscriptionType,
-      }),
-      ...(data.duration && { duration: data.duration }),
+      title,
+      price,
+      subscriptionType,
+      duration,
+      stripePriceId,
+      stripeProductId,
     },
   });
 
@@ -380,6 +569,7 @@ const updateIntoDb = async (id: string, data: Partial<any>) => {
 };
 
 // Hard Delete Subscription
+
 const deleteIntoDb = async (id: string) => {
   const subscription = await prisma.subscription.update({
     where: { id },

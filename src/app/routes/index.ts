@@ -11,6 +11,7 @@ import { MetaRoutes } from '../modules/meta/analytics.route';
 import { GoalRoutes } from '../modules/goal/goal.routes';
 import { BudgetRoutes } from '../modules/budget/budget.routes';
 import { PaymentRoutes } from '../modules/Payment/payment.route';
+import { GlobalRoutes } from '../modules/Global/Global.routes';
 
 const router = express.Router();
 
@@ -62,6 +63,10 @@ const moduleRoutes = [
   {
     path: '/payment',
     route: PaymentRoutes,
+  },
+  {
+    path: '/global',
+    route: GlobalRoutes,
   },
 ];
 

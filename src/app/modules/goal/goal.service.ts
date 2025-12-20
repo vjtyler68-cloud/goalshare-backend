@@ -260,7 +260,7 @@ const addClient = async (
 };
 
 const getAllClientsByGoalId = async (goalId: string) => {
-  await prisma.goal.findUniqueOrThrow({
+  await prisma.goal.findUnique({
     where: { id: goalId },
     select: { id: true },
   });

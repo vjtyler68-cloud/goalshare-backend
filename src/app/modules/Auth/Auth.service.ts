@@ -91,6 +91,7 @@ const createFirebaseLogin = async (payload: User) => {
 
   return { user: updatedUser, accessToken };
 };
+
 const loginWithOtpFromDB = async (
   res: Response,
   payload: {
@@ -98,18 +99,32 @@ const loginWithOtpFromDB = async (
     password: string;
   },
 ) => {
-  const userData = await insecurePrisma.user.findUniqueOrThrow({
+  const userData = await insecurePrisma.user.findUnique({
     where: {
       email: payload.email,
     },
   });
+    if (!userData) {
+      throw new AppError(httpStatus.BAD_REQUEST, 'user not found');
+    }
   const isCorrectPassword: Boolean = await bcrypt.compare(
     payload.password,
-    userData.password,
+    userData?.password,
   );
 
   if (!isCorrectPassword) {
     throw new AppError(httpStatus.BAD_REQUEST, 'Password incorrect');
+  }
+
+  //  if (!userData.isApproved) {
+  //    throw new AppError(
+  //      httpStatus.UNAUTHORIZED,
+  //      'You are not approved by admin!',
+  //    );
+  //  }
+
+  if (userData.isDeleted) {
+    throw new AppError(httpStatus.UNAUTHORIZED, 'You are deleted !');
   }
 
   if (userData.role !== UserRoleEnum.ADMIN && !userData.isEmailVerified) {
@@ -148,6 +163,9 @@ const loginWithOtpFromDB = async (
       isApproved: userData.isApproved,
       isDeleted: userData.isDeleted,
       accessToken: accessToken,
+      subscription: userData.subscriptionId,
+      subscriptionStartDate: userData.subscriptionStart,
+      subscriptionEndDate: userData.subscriptionEnd,
     };
   }
 };
@@ -318,17 +336,17 @@ const verifyEmailWithOtp = async (payload: { email: string; otp: string }) => {
 };
 
 const resendVerificationWithOtp = async (email: string) => {
-  const user = await insecurePrisma.user.findFirstOrThrow({
+  const user = await insecurePrisma.user.findFirst({
     where: {
       email,
     },
   });
 
-  if (user.status === UserStatus.SUSPENDED) {
+  if (user?.status === UserStatus.SUSPENDED) {
     throw new AppError(httpStatus.FORBIDDEN, 'User is Suspended');
   }
 
-  if (user.isEmailVerified) {
+  if (user?.isEmailVerified) {
     throw new AppError(httpStatus.BAD_REQUEST, 'Email is already verified');
   }
 
@@ -395,7 +413,7 @@ const changePassword = async (user: any, payload: any) => {
 };
 
 const forgetPassword = async (email: string) => {
-  const userData = await prisma.user.findUniqueOrThrow({
+  const userData = await prisma.user.findUnique({
     where: {
       email,
     },
@@ -407,6 +425,9 @@ const forgetPassword = async (email: string) => {
       otp: true,
     },
   });
+    if (!userData) {
+      throw new AppError(401, 'User not found');
+    }
 
   if (userData.status === UserStatus.SUSPENDED) {
     throw new AppError(httpStatus.BAD_REQUEST, 'User has suspended');

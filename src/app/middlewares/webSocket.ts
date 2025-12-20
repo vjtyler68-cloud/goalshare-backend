@@ -107,6 +107,25 @@ export async function setupWebSocket(server: Server) {
                 roomId: room.id,
                 message,
               },
+              // ADDED: Include sender and receiver profile info
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
+                receiver: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
+              },
             });
             console.log('Chat saved to DB:', chat.id);
 
@@ -120,9 +139,8 @@ export async function setupWebSocket(server: Server) {
             break;
           }
 
-          // FreeStyleMessage (similar)
+          // FreeStyleMessage
           case 'freeStyleMessage': {
-            // ... same as 'message' but event 'freeStyleMessage'
             const { receiverId, message } = parsedData;
             if (!ws.userId || !receiverId || !message) {
               ws.send(
@@ -167,6 +185,25 @@ export async function setupWebSocket(server: Server) {
                 roomId: room.id,
                 message,
               },
+              // ADDED: Include sender and receiver profile info
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
+                receiver: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
+              },
             });
             console.log('FreeStyle Chat saved:', chat.id);
 
@@ -208,8 +245,23 @@ export async function setupWebSocket(server: Server) {
               where: { roomId: room.id },
               orderBy: { createdAt: 'asc' },
               include: {
-                sender: { select: { id: true, fullName: true } },
-                receiver: { select: { id: true, fullName: true } },
+                // MODIFIED: Added profile field to sender and receiver
+                sender: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
+                receiver: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
               },
             });
 
@@ -255,6 +307,17 @@ export async function setupWebSocket(server: Server) {
 
             const unReadMessages = await prisma.chat.findMany({
               where: { roomId: room.id, isRead: false, receiverId: ws.userId },
+              // ADDED: Include sender profile info in unread messages
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
+              },
             });
 
             ws.send(
@@ -286,9 +349,35 @@ export async function setupWebSocket(server: Server) {
                 OR: [{ senderId: ws.userId }, { receiverId: ws.userId }],
               },
               include: {
-                chat: { orderBy: { createdAt: 'desc' }, take: 1 },
-                sender: { select: { id: true, fullName: true } },
-                receiver: { select: { id: true, fullName: true } },
+                chat: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  // ADDED: Include sender profile in last message
+                  include: {
+                    sender: {
+                      select: {
+                        id: true,
+                        fullName: true,
+                        profile: true, // Profile image URL
+                      },
+                    },
+                  },
+                },
+                // MODIFIED: Added profile field to sender and receiver
+                sender: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                  },
+                },
+                receiver: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                  },
+                },
               },
             });
 
@@ -296,7 +385,11 @@ export async function setupWebSocket(server: Server) {
               const otherUser =
                 room.senderId === ws.userId ? room.receiver : room.sender;
               return {
-                user: { id: otherUser.id, fullName: otherUser.fullName },
+                user: {
+                  id: otherUser.id,
+                  fullName: otherUser.fullName,
+                  profile: otherUser.profile, // ADDED: Include profile image
+                },
                 lastMessage: room.chat[0],
               };
             });
@@ -315,320 +408,20 @@ export async function setupWebSocket(server: Server) {
             const onlineUserList = Array.from(onlineUsers);
             const users = await prisma.user.findMany({
               where: { id: { in: onlineUserList } },
-              select: { id: true, email: true, role: true },
+              // MODIFIED: Added profile field
+              select: {
+                id: true,
+                email: true,
+                role: true,
+                fullName: true,
+                profile: true, // Profile image URL
+              },
             });
             ws.send(JSON.stringify({ event: 'onlineUsers', data: users }));
             break;
           }
 
-          // Community Events
-          // case 'createCommunity': {
-          //   const { name, description, usersToAdd, image } = parsedData; // usersToAdd = memberIds
-          //   if (
-          //     !ws.userId ||
-          //     !name ||
-          //     !Array.isArray(usersToAdd) ||
-          //     usersToAdd.length === 0
-          //   ) {
-          //     console.log('Invalid createCommunity payload');
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Invalid payload' }),
-          //     );
-          //     return;
-          //   }
-
-          //   // Check members exist
-          //   const validMembers = await prisma.user.findMany({
-          //     where: { id: { in: usersToAdd } },
-          //   });
-          //   if (validMembers.length !== usersToAdd.length) {
-          //     ws.send(
-          //       JSON.stringify({
-          //         event: 'error',
-          //         message: 'Some members not found',
-          //       }),
-          //     );
-          //     return;
-          //   }
-
-          //   const community = await prisma.community.create({
-          //     data: {
-          //       name,
-          //       description: description || '',
-          //       image: image || null,
-          //       userId: ws.userId,
-          //       users: {
-          //         create: [
-          //           { userId: ws.userId },
-          //           ...usersToAdd.map(id => ({ userId: id })),
-          //         ],
-          //       },
-          //     },
-          //     include: { users: true },
-          //   });
-          //   console.log('Community created:', community.id);
-
-          //   const allMemberIds = [ws.userId, ...usersToAdd];
-          //   allMemberIds.forEach(id => {
-          //     const socket = userSockets.get(id);
-          //     if (socket)
-          //       socket.send(
-          //         JSON.stringify({
-          //           event: 'communityCreated',
-          //           data: community,
-          //         }),
-          //       );
-          //   });
-          //   break;
-          // }
-
-          // case 'joinCommunity': {
-          //   const { communityId } = parsedData;
-          //   if (!ws.userId || !communityId) {
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Invalid payload' }),
-          //     );
-          //     return;
-          //   }
-
-          //   const community = await prisma.community.findUnique({
-          //     where: { id: communityId },
-          //   });
-          //   if (!community || community.isDeleted) {
-          //     ws.send(
-          //       JSON.stringify({
-          //         event: 'error',
-          //         message: 'Community not found',
-          //       }),
-          //     );
-          //     return;
-          //   }
-
-          //   const existingMember = await prisma.communityMembers.upsert({
-          //     where: { communityId_userId: { communityId, userId: ws.userId } },
-          //     create: { communityId, userId: ws.userId },
-          //     update: { isLeft: false },
-          //   });
-          //   console.log('Community member updated:', existingMember.id);
-
-          //   ws.send(
-          //     JSON.stringify({
-          //       event: 'joinCommunity',
-          //       data: { communityId, success: true },
-          //     }),
-          //   );
-          //   break;
-          // }
-
-          // case 'leaveCommunity': {
-          //   const { communityId } = parsedData;
-          //   if (!ws.userId || !communityId) {
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Invalid payload' }),
-          //     );
-          //     return;
-          //   }
-
-          //   const member = await prisma.communityMembers.findFirst({
-          //     where: { communityId, userId: ws.userId },
-          //   });
-          //   if (!member) {
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Not a member' }),
-          //     );
-          //     return;
-          //   }
-
-          //   await prisma.communityMembers.update({
-          //     where: { id: member.id },
-          //     data: { isLeft: true },
-          //   });
-          //   console.log('User left community:', communityId);
-
-          //   ws.send(
-          //     JSON.stringify({
-          //       event: 'leaveCommunity',
-          //       data: { communityId, success: true },
-          //     }),
-          //   );
-          //   break;
-          // }
-
-          // case 'communityMessage': {
-          //   const { communityId, message } = parsedData;
-          //   if (!ws.userId || !communityId || !message) {
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Invalid payload' }),
-          //     );
-          //     return;
-          //   }
-
-          //   const member = await prisma.communityMembers.findFirst({
-          //     where: { communityId, userId: ws.userId, isLeft: false },
-          //   });
-          //   if (!member) {
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Not a member' }),
-          //     );
-          //     return;
-          //   }
-
-          //   const communityMessage = await prisma.communityMessage.create({
-          //     data: { senderId: ws.userId, communityId, message },
-          //   });
-          //   console.log('Community message saved:', communityMessage.id);
-
-          //   const activeMembers = await prisma.communityMembers.findMany({
-          //     where: { communityId, isLeft: false },
-          //     select: { userId: true },
-          //   });
-
-          //   activeMembers.forEach(({ userId }) => {
-          //     if (userId !== ws.userId) {
-          //       const socket = userSockets.get(userId as string);
-          //       if (socket)
-          //         socket.send(
-          //           JSON.stringify({
-          //             event: 'communityMessage',
-          //             data: communityMessage,
-          //           }),
-          //         );
-          //     }
-          //   });
-          //   ws.send(
-          //     JSON.stringify({
-          //       event: 'communityMessage',
-          //       data: communityMessage,
-          //     }),
-          //   ); // Echo
-          //   break;
-          // }
-
-          // case 'fetchCommunityChats': {
-          //   const { communityId } = parsedData;
-          //   if (!ws.userId || !communityId) {
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Invalid payload' }),
-          //     );
-          //     return;
-          //   }
-
-          //   const member = await prisma.communityMembers.findFirst({
-          //     where: { communityId, userId: ws.userId, isLeft: false },
-          //   });
-          //   if (!member) {
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Not a member' }),
-          //     );
-          //     return;
-          //   }
-
-          //   const chats = await prisma.communityMessage.findMany({
-          //     where: { communityId },
-          //     orderBy: { createdAt: 'asc' },
-          //     include: { sender: { select: { id: true, fullName: true } } },
-          //   });
-
-          //   // Per-user read status upsert
-          //   for (const chat of chats.filter(c => c.senderId !== ws.userId)) {
-          //     await prisma.communityMessageReadStatus.upsert({
-          //       where: {
-          //         messageId_userId: { messageId: chat.id, userId: ws.userId },
-          //       },
-          //       create: { messageId: chat.id, userId: ws.userId },
-          //       update: {},
-          //     });
-          //   }
-          //   console.log(
-          //     'Community chats fetched & marked read for:',
-          //     ws.userId,
-          //   );
-
-          //   ws.send(
-          //     JSON.stringify({ event: 'fetchCommunityChats', data: chats }),
-          //   );
-          //   break;
-          // }
-
-          // case 'communityUnReadMessages': {
-          //   const { communityId } = parsedData;
-          //   if (!ws.userId || !communityId) {
-          //     ws.send(
-          //       JSON.stringify({ event: 'error', message: 'Invalid payload' }),
-          //     );
-          //     return;
-          //   }
-
-          //   const readStatuses =
-          //     await prisma.communityMessageReadStatus.findMany({
-          //       where: { userId: ws.userId },
-          //       select: { messageId: true },
-          //     });
-          //   const readIds = readStatuses.map(rs => rs.messageId);
-
-          //   const unreadMessages = await prisma.communityMessage.findMany({
-          //     where: {
-          //       communityId,
-          //       senderId: { not: ws.userId },
-          //       id: { notIn: readIds },
-          //     },
-          //   });
-
-          //   ws.send(
-          //     JSON.stringify({
-          //       event: 'communityUnReadMessages',
-          //       data: {
-          //         messages: unreadMessages,
-          //         count: unreadMessages.length,
-          //       },
-          //     }),
-          //   );
-          //   break;
-          // }
-
-          // case 'communityMessageList': {
-          //   if (!ws.userId) {
-          //     ws.send(
-          //       JSON.stringify({
-          //         event: 'error',
-          //         message: 'Not authenticated',
-          //       }),
-          //     );
-          //     return;
-          //   }
-
-          //   const communities = await prisma.communityMembers.findMany({
-          //     where: { userId: ws.userId, isLeft: false },
-          //     include: {
-          //       community: {
-          //         include: {
-          //           communityMessages: {
-          //             orderBy: { createdAt: 'desc' },
-          //             take: 1,
-          //           },
-          //         },
-          //       },
-          //     },
-          //   });
-
-          //   const communityList = communities.map(m => ({
-          //     communityId: m.community.id,
-          //     communityName: m.community.name,
-          //     description: m.community.description,
-          //     image: m.community.image,
-          //     lastMessage: m.community.communityMessages[0] || null,
-          //   }));
-
-          //   ws.send(
-          //     JSON.stringify({
-          //       event: 'communityMessageList',
-          //       data: communityList,
-          //     }),
-          //   );
-          //   break;
-          // }
-
-          // Group Events (similar fixes)
+          // Group Events
           case 'createGroup': {
             const { name, memberIds, image, description } = parsedData;
             if (
@@ -682,7 +475,21 @@ export async function setupWebSocket(server: Server) {
                   ],
                 },
               },
-              include: { members: true },
+              include: {
+                members: {
+                  // ADDED: Include user profile in group members
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        fullName: true,
+                        profile: true, // Profile image URL
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
             });
             console.log('Group created:', group.id, 'with image:', group.image);
 
@@ -776,6 +583,17 @@ export async function setupWebSocket(server: Server) {
 
             const groupChat = await prisma.groupChat.create({
               data: { senderId: ws.userId, groupId, message },
+              // ADDED: Include sender profile info
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
+              },
             });
             console.log('Group chat saved:', groupChat.id);
 
@@ -819,7 +637,17 @@ export async function setupWebSocket(server: Server) {
             const chats = await prisma.groupChat.findMany({
               where: { groupId },
               orderBy: { createdAt: 'asc' },
-              include: { sender: { select: { id: true, fullName: true } } },
+              // MODIFIED: Added profile field to sender
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                    email: true,
+                  },
+                },
+              },
             });
 
             // Per-user read status
@@ -859,6 +687,16 @@ export async function setupWebSocket(server: Server) {
                 senderId: { not: ws.userId },
                 id: { notIn: readIds },
               },
+              // ADDED: Include sender profile info in unread messages
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    profile: true, // Profile image URL
+                  },
+                },
+              },
             });
 
             ws.send(
@@ -889,7 +727,20 @@ export async function setupWebSocket(server: Server) {
               include: {
                 group: {
                   include: {
-                    chats: { orderBy: { createdAt: 'desc' }, take: 1 },
+                    chats: {
+                      orderBy: { createdAt: 'desc' },
+                      take: 1,
+                      // ADDED: Include sender profile in last message
+                      include: {
+                        sender: {
+                          select: {
+                            id: true,
+                            fullName: true,
+                            profile: true, // Profile image URL
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -898,6 +749,7 @@ export async function setupWebSocket(server: Server) {
             const groupList = groups.map(m => ({
               groupId: m.group.id,
               groupName: m.group.name,
+              groupImage: m.group.image, // ADDED: Include group image
               lastMessage: m.group.chats[0] || null,
             }));
 
@@ -907,11 +759,8 @@ export async function setupWebSocket(server: Server) {
             break;
           }
 
-          // FreeStyle variants (similar to main, copy if needed)
-          // ... (freeStyleFetchChats, freeStyleUnReadMessages )
-
           case 'project': {
-            ws.send(JSON.stringify({ event: 'project', data: parsedData })); // Placeholder
+            ws.send(JSON.stringify({ event: 'project', data: parsedData }));
             break;
           }
 
@@ -922,12 +771,6 @@ export async function setupWebSocket(server: Server) {
             );
         }
       } catch (error: any) {
-        // console.error(
-        //   'WebSocket Error [Event: ' +
-        //     (parsedData ? parsedData.event : 'unknown') +
-        //     ']:',
-        //   error,
-        // );
         ws.send(
           JSON.stringify({
             event: 'error',

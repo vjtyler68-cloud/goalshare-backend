@@ -3,19 +3,21 @@ import { prisma } from '../../utils/prisma';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { Motivation } from '@prisma/client';
 import { title } from 'process';
+import { uploadToCloudinary } from '../../utils/uploadToCloudinary';
 
 const createIntoDb = async (
   id: string,
   file: Express.Multer.File | undefined,
   title: string,
 ) => {
-  await prisma.user.findUniqueOrThrow({
+  await prisma.user.findUnique({
     where: { id },
   });
 
   let fileUrl: string | null = null;
   if (file) {
-    const location = await uploadToDigitalOceanAWS(file);
+    // const location = await uploadToDigitalOceanAWS(file);
+    const location = await uploadToCloudinary(file);
     fileUrl = location.Location;
   }
 
@@ -85,11 +87,12 @@ const updateIntoDb = async (
   file?: Express.Multer.File,
 ) => {
   // fetch the existing record first (optional but good for validation)
-  await prisma.motivation.findUniqueOrThrow({ where: { id } });
+  await prisma.motivation.findUnique({ where: { id } });
 
   let fileUrl: string | undefined;
   if (file) {
-    const location = await uploadToDigitalOceanAWS(file);
+    // const location = await uploadToDigitalOceanAWS(file);
+    const location = await uploadToCloudinary(file);
     fileUrl = location.Location;
   }
 

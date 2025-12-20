@@ -35,9 +35,15 @@ router.delete(
 
 router.put(
   '/update-profile',
-  auth(UserRoleEnum.ADMIN, UserRoleEnum.USER),
-  upload.single('file'),
+  auth('ANY'),
   UserControllers.updateMyProfile,
+);
+
+router.put(
+  '/update-profile-image',
+  auth('ANY'),
+  upload.single('file'),
+  UserControllers.updateProfileImage,
 );
 
 router.put(
