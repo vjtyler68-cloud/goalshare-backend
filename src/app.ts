@@ -27,7 +27,7 @@ app.use(
       'http://localhost:3000',
       'https://spanx-neworld-dashbaord.vercel.app',
     ],
-    // methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',

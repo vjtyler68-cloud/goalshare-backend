@@ -278,96 +278,6 @@ const assignSubscriptionToUser = async (userId: string, payload: any) => {
 
 // Get Subscription by ID
 
-const getMySubscription = async (userId: string) => {
-  const userWithSubscription = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      subscription: {
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          duration: true,
-          subscriptionType: true,
-        },
-      },
-      payments: {
-        where: {
-          status: PaymentStatus.SUCCESS,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-    },
-  });
-
-  if (!userWithSubscription || !userWithSubscription.subscription) {
-    return null;
-  }
-
-  const sub = userWithSubscription.subscription;
-
-  if (sub.subscriptionType === SubscriptionType.FREE) {
-    const hasSuccessfulPayment = userWithSubscription.payments.some(
-      payment => payment.subscriptionId === sub.id,
-    );
-
-    if (
-      !userWithSubscription.subscriptionStart ||
-      !userWithSubscription.subscriptionEnd ||
-      !hasSuccessfulPayment
-    ) {
-      return null;
-    }
-  }
-
-  let remainingDays: number;
-
-  if (sub.subscriptionType === SubscriptionType.FREE) {
-    // Use duration stored in DB (assuming it’s in days)
-    remainingDays = sub.duration;
-  } else if (sub.subscriptionType === SubscriptionType.MONTHLY) {
-    remainingDays = 30;
-  } else if (sub.subscriptionType === SubscriptionType.YEARLY) {
-    remainingDays = 365;
-  } else {
-    // Fallback: calculate from endDate
-    const now = new Date();
-    const end = userWithSubscription.subscriptionEnd || now;
-    remainingDays = Math.max(
-      Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
-      0,
-    );
-  }
-
-  // if (remainingDays === 0) {
-  //   await prisma.user.update({
-  //     where: { id: userId },
-  //     data: {
-  //       subscriptionId: null,
-  //       subscriptionStart: null,
-  //       subscriptionEnd: null,
-  //     },
-  //   });
-  //   return {
-  //     message: 'Subscription expired. Data reset successfully.',
-  //   };
-  // }
-
-  return {
-    subscription: {
-      id: sub.id,
-      title: sub.title,
-      type: sub.subscriptionType,
-      duration: sub.duration,
-      startDate: userWithSubscription.subscriptionStart,
-      endDate: userWithSubscription.subscriptionEnd,
-      remainingDays,
-    },
-  };
-};
-
 // const getMySubscription = async (userId: string) => {
 //   const userWithSubscription = await prisma.user.findUnique({
 //     where: { id: userId },
@@ -397,9 +307,7 @@ const getMySubscription = async (userId: string) => {
 //   }
 
 //   const sub = userWithSubscription.subscription;
-//   const now = new Date();
 
-//    check free plan validity
 //   if (sub.subscriptionType === SubscriptionType.FREE) {
 //     const hasSuccessfulPayment = userWithSubscription.payments.some(
 //       payment => payment.subscriptionId === sub.id,
@@ -414,50 +322,38 @@ const getMySubscription = async (userId: string) => {
 //     }
 //   }
 
-//   let startDate = userWithSubscription.subscriptionStart;
-//   let endDate = userWithSubscription.subscriptionEnd;
-//   let remainingDays = 0;
+//   let remainingDays: number;
 
-//   if (!startDate) {
-//     startDate = now;
+//   if (sub.subscriptionType === SubscriptionType.FREE) {
+//     // Use duration stored in DB (assuming it’s in days)
+//     remainingDays = sub.duration;
+//   } else if (sub.subscriptionType === SubscriptionType.MONTHLY) {
+//     remainingDays = 30;
+//   } else if (sub.subscriptionType === SubscriptionType.YEARLY) {
+//     remainingDays = 365;
+//   } else {
+//     // Fallback: calculate from endDate
+//     const now = new Date();
+//     const end = userWithSubscription.subscriptionEnd || now;
+//     remainingDays = Math.max(
+//       Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+//       0,
+//     );
 //   }
 
-//   if (!endDate) {
-//     if (sub.subscriptionType === SubscriptionType.MONTHLY) {
-//       endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-//     } else if (sub.subscriptionType === SubscriptionType.YEARLY) {
-  
-//       endDate = new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
-//     } else if (sub.subscriptionType === SubscriptionType.FREE) {
- 
-//       endDate = new Date(
-//         startDate.getTime() + sub.duration * 24 * 60 * 60 * 1000,
-//       );
-//     }
-//   }
-
-// if (!endDate) {
-//   throw new Error('endDate is undefined');
-// }
-
-// remainingDays = Math.max(
-//   Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
-//   0,
-// );
-
-//   if (remainingDays === 0) {
-//     await prisma.user.update({
-//       where: { id: userId },
-//       data: {
-//         subscriptionId: null,
-//         subscriptionStart: null,
-//         subscriptionEnd: null,
-//       },
-//     });
-//     return {
-//       message: 'Subscription expired. Data reset successfully.',
-//     };
-//   }
+//   // if (remainingDays === 0) {
+//   //   await prisma.user.update({
+//   //     where: { id: userId },
+//   //     data: {
+//   //       subscriptionId: null,
+//   //       subscriptionStart: null,
+//   //       subscriptionEnd: null,
+//   //     },
+//   //   });
+//   //   return {
+//   //     message: 'Subscription expired. Data reset successfully.',
+//   //   };
+//   // }
 
 //   return {
 //     subscription: {
@@ -465,12 +361,116 @@ const getMySubscription = async (userId: string) => {
 //       title: sub.title,
 //       type: sub.subscriptionType,
 //       duration: sub.duration,
-//       startDate,
-//       endDate,
+//       startDate: userWithSubscription.subscriptionStart,
+//       endDate: userWithSubscription.subscriptionEnd,
 //       remainingDays,
 //     },
 //   };
 // };
+
+const getMySubscription = async (userId: string) => {
+  const userWithSubscription = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      subscription: {
+        select: {
+          id: true,
+          title: true,
+          price: true,
+          duration: true,
+          subscriptionType: true,
+        },
+      },
+      payments: {
+        where: {
+          status: PaymentStatus.SUCCESS,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+    },
+  });
+
+  if (!userWithSubscription || !userWithSubscription.subscription) {
+    return null;
+  }
+
+  const sub = userWithSubscription.subscription;
+  const now = new Date();
+
+  //  check free plan validity
+  if (sub.subscriptionType === SubscriptionType.FREE) {
+    const hasSuccessfulPayment = userWithSubscription.payments.some(
+      payment => payment.subscriptionId === sub.id,
+    );
+
+    if (
+      !userWithSubscription.subscriptionStart ||
+      !userWithSubscription.subscriptionEnd ||
+      !hasSuccessfulPayment
+    ) {
+      return null;
+    }
+  }
+
+  let startDate = userWithSubscription.subscriptionStart;
+  let endDate = userWithSubscription.subscriptionEnd;
+  let remainingDays = 0;
+
+  if (!startDate) {
+    startDate = now;
+  }
+
+  if (!endDate) {
+    if (sub.subscriptionType === SubscriptionType.MONTHLY) {
+      endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+    } else if (sub.subscriptionType === SubscriptionType.YEARLY) {
+  
+      endDate = new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
+    } else if (sub.subscriptionType === SubscriptionType.FREE) {
+ 
+      endDate = new Date(
+        startDate.getTime() + sub.duration * 24 * 60 * 60 * 1000,
+      );
+    }
+  }
+
+if (!endDate) {
+  throw new Error('endDate is undefined');
+}
+
+remainingDays = Math.max(
+  Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+  0,
+);
+
+  if (remainingDays === 0) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        subscriptionId: null,
+        subscriptionStart: null,
+        subscriptionEnd: null,
+      },
+    });
+    return {
+      message: 'Subscription expired. Data reset successfully.',
+    };
+  }
+
+  return {
+    subscription: {
+      id: sub.id,
+      title: sub.title,
+      type: sub.subscriptionType,
+      duration: sub.duration,
+      startDate,
+      endDate,
+      remainingDays,
+    },
+  };
+};
 
 
 const getSubscriptionByIdFromDB = async (id: string) => {
