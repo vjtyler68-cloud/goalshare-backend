@@ -382,9 +382,9 @@ const getMySubscription = async (userId: string) => {
         },
       },
       payments: {
-        where: {
-          status: PaymentStatus.SUCCESS,
-        },
+        // where: {
+        //   status: PaymentStatus.SUCCESS,
+        // },
         orderBy: {
           createdAt: 'desc',
         },

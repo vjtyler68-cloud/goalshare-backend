@@ -104,9 +104,9 @@ const loginWithOtpFromDB = async (
       email: payload.email,
     },
   });
-    if (!userData) {
-      throw new AppError(httpStatus.BAD_REQUEST, 'user not found');
-    }
+  if (!userData) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'user not found');
+  }
   const isCorrectPassword: Boolean = await bcrypt.compare(
     payload.password,
     userData?.password,
@@ -128,16 +128,19 @@ const loginWithOtpFromDB = async (
   }
 
   if (userData.role !== UserRoleEnum.ADMIN && !userData.isEmailVerified) {
-    const otp = generateOTP();
+    const otp: number = Math.floor(100000 + Math.random() * 900000);
 
     await prisma.user.update({
       where: { email: userData.email },
       data: {
-        otp,
+        otp: otp.toString(),
         otpExpiry: otpExpiryTime(),
       },
     });
-    sendOtpViaMail(payload.email, otp);
+
+    const html = generateOtpEmail(otp);
+
+    await emailSender(payload.email, html, 'OTP Verification');
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -425,9 +428,9 @@ const forgetPassword = async (email: string) => {
       otp: true,
     },
   });
-    if (!userData) {
-      throw new AppError(401, 'User not found');
-    }
+  if (!userData) {
+    throw new AppError(401, 'User not found');
+  }
 
   if (userData.status === UserStatus.SUSPENDED) {
     throw new AppError(httpStatus.BAD_REQUEST, 'User has suspended');
