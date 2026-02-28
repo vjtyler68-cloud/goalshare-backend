@@ -1,6 +1,7 @@
 import { uploadToDigitalOceanAWS } from '../../utils/uploadToDigitalOceanAWS';
 import { prisma } from '../../utils/prisma';
 import QueryBuilder from '../../builder/QueryBuilder';
+import { uploadToCloudinary } from '../../utils/uploadToCloudinary';
 
 const createIntoDb = async (
   id: string,
@@ -13,7 +14,8 @@ const createIntoDb = async (
 
   let fileUrl: string | null = null;
   if (file) {
-    const location = await uploadToDigitalOceanAWS(file);
+    // const location = await uploadToDigitalOceanAWS(file);
+    const location = await uploadToCloudinary(file);
     console.log('Uploaded File URL:', location.Location);
     fileUrl = location.Location;
   }
@@ -75,7 +77,8 @@ const updateIntoDb = async (
 
   let fileUrl: string | undefined;
   if (file) {
-    const location = await uploadToDigitalOceanAWS(file);
+    // const location = await uploadToDigitalOceanAWS(file);
+    const location = await uploadToCloudinary(file);
     fileUrl = location.Location;
   }
 

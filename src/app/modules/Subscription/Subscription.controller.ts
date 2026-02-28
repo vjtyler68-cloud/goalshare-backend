@@ -49,6 +49,15 @@ const getMySubscription = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const updateInAppPlan = catchAsync(async (req: Request, res: Response) => {
+  const result = await SubscriptionServices.updateInAppPurchasePlanData(req);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Successfully buy my Subscription ',
+    data: result,
+  });
+});
 const getSubscriptionById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const result = await SubscriptionServices.getSubscriptionByIdFromDB(id);
@@ -103,4 +112,5 @@ export const SubscriptionController = {
   deleteIntoDb,
   getMySubscription,
   deleteMySubscription,
+  updateInAppPlan,
 };

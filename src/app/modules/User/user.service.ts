@@ -1,5 +1,5 @@
 import httpStatus from 'http-status';
-import { User, UserRoleEnum, UserStatus } from '@prisma/client';
+import { SubscriptionType, User, UserRoleEnum, UserStatus } from '@prisma/client';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { prisma } from '../../utils/prisma';
 import { Request } from 'express';
@@ -177,27 +177,108 @@ const updateUserStatus = async (id: string, status: UserStatus) => {
   });
   return result;
 };
-const updateUserApproval = async (userId: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      isApproved: true,
-    },
-  });
 
-  if (!user) {
-    throw new AppError(httpStatus.NOT_FOUND, 'User not found');
-  }
-  const result = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      isApproved: true,
-    },
+interface ApprovalResult {
+  userId: string;
+  fullName: string;
+  email: string;
+  isApproved: boolean;
+  subscription?: {
+    id: string;
+    title: string;
+    startDate: Date;
+    endDate: Date;
+    type: SubscriptionType;
+  };
+}
+
+const updateUserApproval = async (userId: string): Promise<ApprovalResult> => {
+  return await prisma.$transaction(async tx => {
+    // 1. Find user
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        isApproved: true,
+        subscriptionId: true,
+        subscriptionStart: true,
+        subscriptionEnd: true,
+        hasUsedFree: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError(httpStatus.NOT_FOUND, 'User not found');
+    }
+
+    if (user.isApproved) {
+      throw new AppError(httpStatus.BAD_REQUEST, 'User is already approved');
+    }
+
+    // 2. Find the 3-month free subscription plan
+    //    → Preferably use a fixed ID or unique identifier
+    const freePlan = await tx.subscription.findFirst({
+      where: {
+        subscriptionType: SubscriptionType.FREE,
+        price: 0,
+        duration: 90, // or title: "3-Month Free (Approval Reward)"
+        isActive: true,
+      },
+      select: {
+        id: true,
+        title: true,
+        subscriptionType: true,
+        duration: true,
+      },
+    });
+
+    if (!freePlan) {
+      throw new AppError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        'Free 3-month plan not found in database. Please contact support.',
+      );
+    }
+
+    const now = new Date();
+    const endDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // +90 days
+
+    // 4. Update user
+    const updatedUser = await tx.user.update({
+      where: { id: userId },
+      data: {
+        isApproved: true,
+        subscriptionId: freePlan.id,
+        subscriptionStart: now,
+        subscriptionEnd: endDate,
+        hasUsedFree: true, // prevent re-using free plan logic if needed
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        isApproved: true,
+        subscriptionId: true,
+        subscriptionStart: true,
+        subscriptionEnd: true,
+      },
+    });
+
+    return {
+      userId: updatedUser.id,
+      fullName: updatedUser.fullName,
+      email: updatedUser.email,
+      isApproved: updatedUser.isApproved,
+      subscription: {
+        id: freePlan.id,
+        title: freePlan.title,
+        startDate: now,
+        endDate,
+        type: freePlan.subscriptionType,
+      },
+    };
   });
-  return result;
 };
 
 const softDeleteUserIntoDB = async (id: string) => {

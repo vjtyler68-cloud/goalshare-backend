@@ -47,5 +47,5 @@
 
 ---
 
-Happy Coding - Developeremdad 🧑‍💻
+Happy Coding 🧑‍💻
 # backend-template

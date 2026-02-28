@@ -274,99 +274,118 @@ const assignSubscriptionToUser = async (userId: string, payload: any) => {
   }
 };
 
-//............................//
+//* in app purchase
+const updateInAppPurchasePlanData = async (req: Request) => {
+  const userId = req.user.id;
+  const {
+    subscriptionId,
+    amount,
+    currency = 'usd',
+    subscriptionStart,
+    subscriptionEnd,
+    purchaseToken, // From Google Play
+    receipt, // From Apple
+    platform, // 'android' | 'ios'
+  } = req.body;
 
-// Get Subscription by ID
+  if (!subscriptionId || !amount || !subscriptionStart || !subscriptionEnd) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Missing required fields');
+  }
 
-// const getMySubscription = async (userId: string) => {
-//   const userWithSubscription = await prisma.user.findUnique({
-//     where: { id: userId },
-//     include: {
-//       subscription: {
-//         select: {
-//           id: true,
-//           title: true,
-//           price: true,
-//           duration: true,
-//           subscriptionType: true,
-//         },
-//       },
-//       payments: {
-//         where: {
-//           status: PaymentStatus.SUCCESS,
-//         },
-//         orderBy: {
-//           createdAt: 'desc',
-//         },
-//       },
-//     },
-//   });
+  //  if (!subscriptionId || !amount || !platform) {
+  //    throw new AppError(httpStatus.BAD_REQUEST, 'Missing required fields');
+  //  }
 
-//   if (!userWithSubscription || !userWithSubscription.subscription) {
-//     return null;
-//   }
+  //  if (platform === 'android' && !purchaseToken) {
+  //    throw new AppError(
+  //      httpStatus.BAD_REQUEST,
+  //      'purchaseToken required for Android',
+  //    );
+  //  }
 
-//   const sub = userWithSubscription.subscription;
+  //  if (platform === 'ios' && !receipt) {
+  //    throw new AppError(httpStatus.BAD_REQUEST, 'receipt required for iOS');
+  //  }
 
-//   if (sub.subscriptionType === SubscriptionType.FREE) {
-//     const hasSuccessfulPayment = userWithSubscription.payments.some(
-//       payment => payment.subscriptionId === sub.id,
-//     );
+  //  // ── Step 1: Verify with Google/Apple ──────────────────────────────────────
+  //  let subscriptionStart: Date;
+  //  let subscriptionEnd: Date;
 
-//     if (
-//       !userWithSubscription.subscriptionStart ||
-//       !userWithSubscription.subscriptionEnd ||
-//       !hasSuccessfulPayment
-//     ) {
-//       return null;
-//     }
-//   }
+  //  if (platform === 'android') {
+  //    const { isValid, expiryTimeMillis } = await verifyGooglePlayToken(
+  //      process.env.ANDROID_PACKAGE_NAME!, // e.g. 'com.goal'
+  //      subscriptionId,
+  //      purchaseToken,
+  //    );
 
-//   let remainingDays: number;
+  //    if (!isValid) {
+  //      throw new AppError(
+  //        httpStatus.BAD_REQUEST,
+  //        'Invalid or expired Google Play purchase',
+  //      );
+  //    }
 
-//   if (sub.subscriptionType === SubscriptionType.FREE) {
-//     // Use duration stored in DB (assuming it’s in days)
-//     remainingDays = sub.duration;
-//   } else if (sub.subscriptionType === SubscriptionType.MONTHLY) {
-//     remainingDays = 30;
-//   } else if (sub.subscriptionType === SubscriptionType.YEARLY) {
-//     remainingDays = 365;
-//   } else {
-//     // Fallback: calculate from endDate
-//     const now = new Date();
-//     const end = userWithSubscription.subscriptionEnd || now;
-//     remainingDays = Math.max(
-//       Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
-//       0,
-//     );
-//   }
+  //    subscriptionStart = new Date();
+  //    subscriptionEnd = new Date(parseInt(expiryTimeMillis));
+  //  } else if (platform === 'ios') {
+  //    const { isValid, expiresDateMs } = await verifyAppleReceipt(receipt);
 
-//   // if (remainingDays === 0) {
-//   //   await prisma.user.update({
-//   //     where: { id: userId },
-//   //     data: {
-//   //       subscriptionId: null,
-//   //       subscriptionStart: null,
-//   //       subscriptionEnd: null,
-//   //     },
-//   //   });
-//   //   return {
-//   //     message: 'Subscription expired. Data reset successfully.',
-//   //   };
-//   // }
+  //    if (!isValid) {
+  //      throw new AppError(
+  //        httpStatus.BAD_REQUEST,
+  //        'Invalid or expired Apple receipt',
+  //      );
+  //    }
 
-//   return {
-//     subscription: {
-//       id: sub.id,
-//       title: sub.title,
-//       type: sub.subscriptionType,
-//       duration: sub.duration,
-//       startDate: userWithSubscription.subscriptionStart,
-//       endDate: userWithSubscription.subscriptionEnd,
-//       remainingDays,
-//     },
-//   };
-// };
+  //    subscriptionStart = new Date();
+  //    subscriptionEnd = new Date(parseInt(expiresDateMs));
+  //  } else {
+  //    throw new AppError(
+  //      httpStatus.BAD_REQUEST,
+  //      'Invalid platform. Use "android" or "ios"',
+  //    );
+  //  }
+
+  return await prisma.$transaction(async tx => {
+    const currentUser = await tx.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        subscriptionId:true,
+        subscriptionStart: true,
+        subscriptionEnd: true,
+      },
+    });
+    if (!currentUser) {
+      throw new AppError(httpStatus.BAD_REQUEST, 'User not found');
+    }
+
+    await tx.payment.create({
+      data: {
+        userId,
+        subscriptionId,
+        amount,
+        currency,
+        status: PaymentStatus.SUCCESS,
+      },
+    });
+
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        subscriptionId,
+        subscriptionStart: new Date(subscriptionStart),
+        subscriptionEnd: new Date(subscriptionEnd),
+      },
+    });
+
+    return {
+      currentUser,
+    };
+  });
+};
 
 const getMySubscription = async (userId: string) => {
   const userWithSubscription = await prisma.user.findUnique({
@@ -381,14 +400,6 @@ const getMySubscription = async (userId: string) => {
           subscriptionType: true,
         },
       },
-      payments: {
-        // where: {
-        //   status: PaymentStatus.SUCCESS,
-        // },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
     },
   });
 
@@ -401,14 +412,11 @@ const getMySubscription = async (userId: string) => {
 
   //  check free plan validity
   if (sub.subscriptionType === SubscriptionType.FREE) {
-    const hasSuccessfulPayment = userWithSubscription.payments.some(
-      payment => payment.subscriptionId === sub.id,
-    );
+    
 
     if (
       !userWithSubscription.subscriptionStart ||
-      !userWithSubscription.subscriptionEnd ||
-      !hasSuccessfulPayment
+      !userWithSubscription.subscriptionEnd 
     ) {
       return null;
     }
@@ -426,24 +434,22 @@ const getMySubscription = async (userId: string) => {
     if (sub.subscriptionType === SubscriptionType.MONTHLY) {
       endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
     } else if (sub.subscriptionType === SubscriptionType.YEARLY) {
-  
       endDate = new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
     } else if (sub.subscriptionType === SubscriptionType.FREE) {
- 
       endDate = new Date(
         startDate.getTime() + sub.duration * 24 * 60 * 60 * 1000,
       );
     }
   }
 
-if (!endDate) {
-  throw new Error('endDate is undefined');
-}
+  if (!endDate) {
+    throw new Error('endDate is undefined');
+  }
 
-remainingDays = Math.max(
-  Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
-  0,
-);
+  remainingDays = Math.max(
+    Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+    0,
+  );
 
   if (remainingDays === 0) {
     await prisma.user.update({
@@ -472,7 +478,6 @@ remainingDays = Math.max(
   };
 };
 
-
 const getSubscriptionByIdFromDB = async (id: string) => {
   const subscription = await prisma.subscription.findUnique({
     where: { id },
@@ -482,91 +487,91 @@ const getSubscriptionByIdFromDB = async (id: string) => {
 };
 
 // // Update Subscription
-// const updateIntoDb = async (id: string, data: Partial<any>) => {
-//   const subscription = await prisma.subscription.update({
-//     where: { id },
-//     data: {
-//       ...(data.title && { title: data.title }),
-//       ...(data.price && { price: parseFloat(data.price) }),
-//       ...(data.subscriptionType && {
-//         subscriptionType: data.subscriptionType,
-//       }),
-//       ...(data.duration && { duration: data.duration }),
-//     },
-//   });
-
-//   return subscription;
-// };
-
 const updateIntoDb = async (id: string, data: Partial<any>) => {
-  const existing = await prisma.subscription.findUnique({
-    where: { id },
-  });
-
-  if (!existing) {
-    throw new AppError(404, 'Subscription not found');
-  }
-
-  const title = data.title || existing.title;
-  const price = data.price ? parseFloat(data.price) : existing.price;
-  const subscriptionType = data.subscriptionType || existing.subscriptionType;
-  const duration =
-    data.duration !== undefined ? data.duration : existing.duration;
-
-  let stripePriceId: string | null = existing.stripePriceId;
-  let stripeProductId: string | null = existing.stripeProductId;
-
-  // Handle Stripe updates for paid subscriptions (create new product and price)
-  if (
-    subscriptionType === SubscriptionType.MONTHLY ||
-    subscriptionType === SubscriptionType.YEARLY
-  ) {
-    if (!price || price <= 0) {
-      throw new AppError(
-        400,
-        'Price must be greater than 0 for paid subscriptions',
-      );
-    }
-
-    // Create new Stripe Product
-    const product = await stripe.products.create({
-      name: title,
-      description: subscriptionType,
-      active: true,
-    });
-
-    // Create new Stripe Price
-    const stripePrice = await stripe.prices.create({
-      product: product.id,
-      unit_amount: Math.round(price * 100),
-      currency: 'usd',
-      recurring: {
-        interval:
-          subscriptionType === SubscriptionType.MONTHLY ? 'month' : 'year',
-      },
-    });
-
-    stripeProductId = product.id;
-    stripePriceId = stripePrice.id;
-  } else {
-    stripePriceId = null;
-    stripeProductId = null;
-  }
-
   const subscription = await prisma.subscription.update({
     where: { id },
     data: {
-      title,
-      price,
-      subscriptionType,
-      duration,
-      stripePriceId,
-      stripeProductId,
+      ...(data.title && { title: data.title }),
+      ...(data.price && { price: parseFloat(data.price) }),
+      ...(data.subscriptionType && {
+        subscriptionType: data.subscriptionType,
+      }),
+      ...(data.duration && { duration: data.duration }),
     },
   });
 
   return subscription;
 };
+
+// const updateIntoDb = async (id: string, data: Partial<any>) => {
+//   const existing = await prisma.subscription.findUnique({
+//     where: { id },
+//   });
+
+//   if (!existing) {
+//     throw new AppError(404, 'Subscription not found');
+//   }
+
+//   const title = data.title || existing.title;
+//   const price = data.price ? parseFloat(data.price) : existing.price;
+//   const subscriptionType = data.subscriptionType || existing.subscriptionType;
+//   const duration =
+//     data.duration !== undefined ? data.duration : existing.duration;
+
+//   let stripePriceId: string | null = existing.stripePriceId;
+//   let stripeProductId: string | null = existing.stripeProductId;
+
+//   // Handle Stripe updates for paid subscriptions (create new product and price)
+//   if (
+//     subscriptionType === SubscriptionType.MONTHLY ||
+//     subscriptionType === SubscriptionType.YEARLY
+//   ) {
+//     if (!price || price <= 0) {
+//       throw new AppError(
+//         400,
+//         'Price must be greater than 0 for paid subscriptions',
+//       );
+//     }
+
+//     // Create new Stripe Product
+//     const product = await stripe.products.create({
+//       name: title,
+//       description: subscriptionType,
+//       active: true,
+//     });
+
+//     // Create new Stripe Price
+//     const stripePrice = await stripe.prices.create({
+//       product: product.id,
+//       unit_amount: Math.round(price * 100),
+//       currency: 'usd',
+//       recurring: {
+//         interval:
+//           subscriptionType === SubscriptionType.MONTHLY ? 'month' : 'year',
+//       },
+//     });
+
+//     stripeProductId = product.id;
+//     stripePriceId = stripePrice.id;
+//   } else {
+//     stripePriceId = null;
+//     stripeProductId = null;
+//   }
+
+//   const subscription = await prisma.subscription.update({
+//     where: { id },
+//     data: {
+//       title,
+//       price,
+//       subscriptionType,
+//       duration,
+//       stripePriceId,
+//       stripeProductId,
+//     },
+//   });
+
+//   return subscription;
+// };
 
 // Hard Delete Subscription
 
@@ -613,4 +618,5 @@ export const SubscriptionServices = {
   deleteIntoDb,
   getMySubscription,
   deleteMySubscription,
+  updateInAppPurchasePlanData,
 };

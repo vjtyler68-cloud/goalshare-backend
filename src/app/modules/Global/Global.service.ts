@@ -116,7 +116,7 @@ const createAffirmation = async (
   const userId = req.user.id as string;
 
   if (!text) {
-    return null; 
+    return null;
   }
 
   const result = await prisma.globalAffirmation.create({

@@ -165,10 +165,11 @@ const loginWithOtpFromDB = async (
       role: userData.role,
       isApproved: userData.isApproved,
       isDeleted: userData.isDeleted,
-      accessToken: accessToken,
+      hasFreeUsed : userData.hasUsedFree,
       subscription: userData.subscriptionId,
       subscriptionStartDate: userData.subscriptionStart,
       subscriptionEndDate: userData.subscriptionEnd,
+      accessToken: accessToken,
     };
   }
 };
