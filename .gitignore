@@ -5,3 +5,4 @@ node_modules
 generate-module.ts
 dist
 .env
+src/config/serviceAccount.json

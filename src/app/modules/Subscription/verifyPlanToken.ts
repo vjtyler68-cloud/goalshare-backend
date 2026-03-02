@@ -1,40 +1,49 @@
 import { google } from 'googleapis';
+import serviceAccount from '../../../config/serviceAccount.json';
+// ── Constants ──────────────────────────────────────────────────────────────────
+const ANDROID_PACKAGE_NAME = process.env.ANDROID_PACKAGE_NAME!;
 
-// ─── Verify Google Play Token ─────────────────────────────────────────────────
-const verifyGooglePlayToken = async (
-  packageName: string,
+// ── Verify Google Play Token ───────────────────────────────────────────────────
+export const verifyGooglePlayToken = async (
   productId: string,
   purchaseToken: string,
-): Promise<{ isValid: boolean; expiryTimeMillis: string }> => {
+): Promise<{ isValid: boolean; expiryTime: Date }> => {
+  // ✅ expiryTime: Date
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON!),
+    // credentials: JSON.parse(
+    //   process.env.GOOGLE_SERVICE_ACCOUNT_JSON!.replace(/\\n/g, '\n'),
+    // ),
+    credentials: serviceAccount,
     scopes: ['https://www.googleapis.com/auth/androidpublisher'],
   });
 
   const androidPublisher = google.androidpublisher({ version: 'v3', auth });
 
   const response = await androidPublisher.purchases.subscriptions.get({
-    packageName,
+    packageName: ANDROID_PACKAGE_NAME, // ✅ from constant
     subscriptionId: productId,
     token: purchaseToken,
   });
+//   console.log({response})
+
 
   const purchase = response.data;
 
   const isValid =
-    purchase.paymentState === 1 && // 1 = Payment received
+    purchase.paymentState === 1 &&
     parseInt(purchase.expiryTimeMillis!) > Date.now();
 
   return {
     isValid,
-    expiryTimeMillis: purchase.expiryTimeMillis!,
+    expiryTime: new Date(parseInt(purchase.expiryTimeMillis!)), // ✅ expiryTime
   };
 };
 
-// ─── Verify Apple Receipt ─────────────────────────────────────────────────────
-const verifyAppleReceipt = async (
+// ── Verify Apple Receipt ───────────────────────────────────────────────────────
+export const verifyAppleReceipt = async (
   receipt: string,
-): Promise<{ isValid: boolean; expiresDateMs: string }> => {
+): Promise<{ isValid: boolean; expiryTime: Date }> => {
+  // ✅ expiryTime: Date
   const verifyWithUrl = async (url: string) => {
     const res = await fetch(url, {
       method: 'POST',
@@ -48,10 +57,8 @@ const verifyAppleReceipt = async (
     return res.json();
   };
 
-  // Try production first, fallback to sandbox
   let data = await verifyWithUrl('https://buy.itunes.apple.com/verifyReceipt');
 
-  // status 21007 = sandbox receipt sent to production → retry with sandbox
   if (data.status === 21007) {
     data = await verifyWithUrl(
       'https://sandbox.itunes.apple.com/verifyReceipt',
@@ -59,15 +66,14 @@ const verifyAppleReceipt = async (
   }
 
   if (data.status !== 0 || !data.latest_receipt_info?.length) {
-    return { isValid: false, expiresDateMs: '0' };
+    return { isValid: false, expiryTime: new Date(0) }; // ✅ expiryTime
   }
 
-  // Get the most recent receipt (already sorted by Apple)
   const latest = data.latest_receipt_info[0];
   const isValid = parseInt(latest.expires_date_ms) > Date.now();
 
   return {
     isValid,
-    expiresDateMs: latest.expires_date_ms,
+    expiryTime: new Date(parseInt(latest.expires_date_ms)), // ✅ expiryTime
   };
 };

@@ -10,13 +10,14 @@ import httpStatus from 'http-status';
 const router = express.Router();
 
 router.get('/', SubscriptionController.getAllSubscription);
+router.post('/verify-token', SubscriptionController.verifySubscription);
 router.get(
   '/current-date',
   catchAsync(async (req: Request, res: Response) => {
     const currentDate = new Date();
     const date = {
-      currentDate
-    }
+      currentDate,
+    };
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,

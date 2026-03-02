@@ -1,8 +1,9 @@
 import { createServer, Server as HTTPServer } from 'http';
 import app from './app';
 import config from './config';
-// import seedSuperAdmin from './app/DB';
+import seedSuperAdmin from './app/DB';
 import { setupWebSocket } from './app/middlewares/webSocket';
+import seedSubscriptions from './app/DB/db.plan';
 
 const port = config.port || 5000;
 
@@ -11,11 +12,11 @@ async function main() {
 
   server.listen(port, async () => {
     console.log('Server is running on port ', port);
-    // seedSuperAdmin();
+    await seedSuperAdmin();
+    await seedSubscriptions();
 
     try {
       await setupWebSocket(server);
-    
     } catch (error) {
       console.error('Failed to setup WebSocket:', error);
       // Optionally close server on failure

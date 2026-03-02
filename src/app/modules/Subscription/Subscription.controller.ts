@@ -39,9 +39,19 @@ const assignSubscription = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const verifySubscription = catchAsync(async (req: Request, res: Response) => {
+
+  const result = await SubscriptionServices.verifyToken(req);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Verify token ',
+    data: result,
+  });
+});
 const getMySubscription = catchAsync(async (req: Request, res: Response) => {
-  const userId = req.user.id;
-  const result = await SubscriptionServices.getMySubscription(userId);
+ 
+  const result = await SubscriptionServices.getMySubscription(req);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -113,4 +123,5 @@ export const SubscriptionController = {
   getMySubscription,
   deleteMySubscription,
   updateInAppPlan,
+  verifySubscription,
 };

@@ -5,6 +5,7 @@ import { PaymentStatus, SubscriptionType } from '@prisma/client';
 import AppError from '../../errors/AppError';
 import { stripe } from '../../utils/stripe';
 import Stripe from 'stripe';
+import { verifyAppleReceipt, verifyGooglePlayToken } from './verifyPlanToken';
 
 // Create Subscription
 const createIntoDb = async (req: Request) => {
@@ -275,6 +276,68 @@ const assignSubscriptionToUser = async (userId: string, payload: any) => {
 };
 
 //* in app purchase
+
+const verifyToken = async (req: Request) => {
+  const {
+    productId,
+    purchaseToken, // Android
+    receipt, // iOS
+    platform, // 'android' | 'ios'
+  } = req.body;
+
+  // ── Validation ───────────────────────────────────────────────────────────
+  if (!productId || !platform) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Missing required fields');
+  }
+
+  if (!['android', 'ios'].includes(platform)) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      'platform must be "android" or "ios"',
+    );
+  }
+
+  if (platform === 'android' && !purchaseToken) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      'purchaseToken required for Android',
+    );
+  }
+
+  if (platform === 'ios' && !receipt) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'receipt required for iOS');
+  }
+
+  // ── Verify ───────────────────────────────────────────────────────────────
+  if (platform === 'android') {
+    const { isValid, expiryTime } = await verifyGooglePlayToken(
+      productId,
+      purchaseToken,
+    );
+
+    if (!isValid) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        'Invalid or expired Google Play purchase',
+      );
+    }
+
+    return { isValid, expiryTime, platform };
+  }
+
+  if (platform === 'ios') {
+    const { isValid, expiryTime } = await verifyAppleReceipt(receipt);
+
+    if (!isValid) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        'Invalid or expired Apple receipt',
+      );
+    }
+
+    return { isValid, expiryTime, platform };
+  }
+};
 const updateInAppPurchasePlanData = async (req: Request) => {
   const userId = req.user.id;
   const {
@@ -283,8 +346,7 @@ const updateInAppPurchasePlanData = async (req: Request) => {
     currency = 'usd',
     subscriptionStart,
     subscriptionEnd,
-    purchaseToken, // From Google Play
-    receipt, // From Apple
+    planPurchaseToken,
     platform, // 'android' | 'ios'
   } = req.body;
 
@@ -292,59 +354,9 @@ const updateInAppPurchasePlanData = async (req: Request) => {
     throw new AppError(httpStatus.BAD_REQUEST, 'Missing required fields');
   }
 
-  //  if (!subscriptionId || !amount || !platform) {
-  //    throw new AppError(httpStatus.BAD_REQUEST, 'Missing required fields');
-  //  }
-
-  //  if (platform === 'android' && !purchaseToken) {
-  //    throw new AppError(
-  //      httpStatus.BAD_REQUEST,
-  //      'purchaseToken required for Android',
-  //    );
-  //  }
-
-  //  if (platform === 'ios' && !receipt) {
-  //    throw new AppError(httpStatus.BAD_REQUEST, 'receipt required for iOS');
-  //  }
-
-  //  // ── Step 1: Verify with Google/Apple ──────────────────────────────────────
-  //  let subscriptionStart: Date;
-  //  let subscriptionEnd: Date;
-
-  //  if (platform === 'android') {
-  //    const { isValid, expiryTimeMillis } = await verifyGooglePlayToken(
-  //      process.env.ANDROID_PACKAGE_NAME!, // e.g. 'com.goal'
-  //      subscriptionId,
-  //      purchaseToken,
-  //    );
-
-  //    if (!isValid) {
-  //      throw new AppError(
-  //        httpStatus.BAD_REQUEST,
-  //        'Invalid or expired Google Play purchase',
-  //      );
-  //    }
-
-  //    subscriptionStart = new Date();
-  //    subscriptionEnd = new Date(parseInt(expiryTimeMillis));
-  //  } else if (platform === 'ios') {
-  //    const { isValid, expiresDateMs } = await verifyAppleReceipt(receipt);
-
-  //    if (!isValid) {
-  //      throw new AppError(
-  //        httpStatus.BAD_REQUEST,
-  //        'Invalid or expired Apple receipt',
-  //      );
-  //    }
-
-  //    subscriptionStart = new Date();
-  //    subscriptionEnd = new Date(parseInt(expiresDateMs));
-  //  } else {
-  //    throw new AppError(
-  //      httpStatus.BAD_REQUEST,
-  //      'Invalid platform. Use "android" or "ios"',
-  //    );
-  //  }
+  if (!subscriptionId || !amount || !subscriptionStart || !subscriptionEnd) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Missing required fields');
+  }
 
   return await prisma.$transaction(async tx => {
     const currentUser = await tx.user.findUnique({
@@ -353,7 +365,7 @@ const updateInAppPurchasePlanData = async (req: Request) => {
         id: true,
         fullName: true,
         email: true,
-        subscriptionId:true,
+        subscriptionId: true,
         subscriptionStart: true,
         subscriptionEnd: true,
       },
@@ -372,85 +384,58 @@ const updateInAppPurchasePlanData = async (req: Request) => {
       },
     });
 
-    await tx.user.update({
+    const updateUser = await tx.user.update({
       where: { id: userId },
       data: {
         subscriptionId,
         subscriptionStart: new Date(subscriptionStart),
         subscriptionEnd: new Date(subscriptionEnd),
+        planPurchaseToken,
+        platform,
       },
     });
 
     return {
-      currentUser,
+      updateUser,
     };
   });
 };
 
-const getMySubscription = async (userId: string) => {
-  const userWithSubscription = await prisma.user.findUnique({
+const getMySubscription = async (req: Request) => {
+  const userId = req.user.id;
+  const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: {
-      subscription: {
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          duration: true,
-          subscriptionType: true,
-        },
-      },
+    select: {
+      id: true,
+      subscriptionStart: true,
+      subscriptionEnd: true,
+      platform: true,
+      subscriptionId: true,
     },
   });
 
-  if (!userWithSubscription || !userWithSubscription.subscription) {
-    return null;
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, 'User not found');
   }
 
-  const sub = userWithSubscription.subscription;
+  // ─── No Subscription ──────────────────────────────────────
+  if (!user.subscriptionStart || !user.subscriptionEnd) {
+    return {
+      hasPlan: false,
+      subscription: null,
+    };
+  }
+
   const now = new Date();
+  const endDate = new Date(user.subscriptionEnd);
+  const startDate = new Date(user.subscriptionStart);
 
-  //  check free plan validity
-  if (sub.subscriptionType === SubscriptionType.FREE) {
-    
-
-    if (
-      !userWithSubscription.subscriptionStart ||
-      !userWithSubscription.subscriptionEnd 
-    ) {
-      return null;
-    }
-  }
-
-  let startDate = userWithSubscription.subscriptionStart;
-  let endDate = userWithSubscription.subscriptionEnd;
-  let remainingDays = 0;
-
-  if (!startDate) {
-    startDate = now;
-  }
-
-  if (!endDate) {
-    if (sub.subscriptionType === SubscriptionType.MONTHLY) {
-      endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-    } else if (sub.subscriptionType === SubscriptionType.YEARLY) {
-      endDate = new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
-    } else if (sub.subscriptionType === SubscriptionType.FREE) {
-      endDate = new Date(
-        startDate.getTime() + sub.duration * 24 * 60 * 60 * 1000,
-      );
-    }
-  }
-
-  if (!endDate) {
-    throw new Error('endDate is undefined');
-  }
-
-  remainingDays = Math.max(
+  const remainingDays = Math.max(
     Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
     0,
   );
 
+  // ─── Expired ──────────────────────────────────────────────
   if (remainingDays === 0) {
     await prisma.user.update({
       where: { id: userId },
@@ -460,17 +445,19 @@ const getMySubscription = async (userId: string) => {
         subscriptionEnd: null,
       },
     });
+
     return {
-      message: 'Subscription expired. Data reset successfully.',
+      hasPlan: false,
+      message: 'Subscription expired',
+      subscription: null,
     };
   }
 
+  // ─── Active ───────────────────────────────────────────────
   return {
+    hasPlan: true,
     subscription: {
-      id: sub.id,
-      title: sub.title,
-      type: sub.subscriptionType,
-      duration: sub.duration,
+      platform: user.platform,
       startDate,
       endDate,
       remainingDays,
@@ -619,4 +606,5 @@ export const SubscriptionServices = {
   getMySubscription,
   deleteMySubscription,
   updateInAppPurchasePlanData,
+  verifyToken,
 };

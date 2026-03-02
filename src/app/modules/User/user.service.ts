@@ -252,7 +252,7 @@ const updateUserApproval = async (userId: string): Promise<ApprovalResult> => {
         subscriptionId: freePlan.id,
         subscriptionStart: now,
         subscriptionEnd: endDate,
-        hasUsedFree: true, // prevent re-using free plan logic if needed
+        hasUsedFree: true,
       },
       select: {
         id: true,

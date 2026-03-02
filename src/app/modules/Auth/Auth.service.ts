@@ -34,7 +34,7 @@ const createFirebaseLogin = async (payload: User) => {
         profile: payload.profile || '',
         email: payload.email,
         password: payload.password || '',
-        fcmToken: payload.fcmToken,
+        fcmToken: payload.fcmToken ?? null,
         isEmailVerified: true,
         isAgreeWithTerms: true,
         status: UserStatus.ACTIVE,
