@@ -422,7 +422,12 @@ const getMySubscription = async (req: Request) => {
   if (!user.subscriptionStart || !user.subscriptionEnd) {
     return {
       hasPlan: false,
-      subscription: null,
+      subscription: {
+        platform: null,
+        startDate: user.subscriptionStart,
+        endDate: user.subscriptionEnd,
+        remainingDays: null,
+      },
     };
   }
 
@@ -448,8 +453,12 @@ const getMySubscription = async (req: Request) => {
 
     return {
       hasPlan: false,
-      message: 'Subscription expired',
-      subscription: null,
+      subscription: {
+        platform: user.platform ?? null,
+        startDate,
+        endDate,
+        remainingDays,
+      },
     };
   }
 

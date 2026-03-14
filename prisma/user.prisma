@@ -29,7 +29,7 @@ model User {
   subscriptionStart DateTime?
   subscriptionEnd   DateTime?
   hasUsedFree       Boolean       @default(false)
-  subscriptionId    String? @db.ObjectId
+  subscriptionId    String?
   subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
   stripeCustomerId  String?
 

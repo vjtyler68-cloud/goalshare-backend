@@ -1,5 +1,10 @@
 import httpStatus from 'http-status';
-import { SubscriptionType, User, UserRoleEnum, UserStatus } from '@prisma/client';
+import {
+  SubscriptionType,
+  User,
+  UserRoleEnum,
+  UserStatus,
+} from '@prisma/client';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { prisma } from '../../utils/prisma';
 import { Request } from 'express';
@@ -78,14 +83,15 @@ const getMyProfileFromDB = async (id: string) => {
       city: true,
       address: true,
       profile: true,
-      subscription: {
-        select: {
-          id: true,
-          title: true,
-          price: true,
-        },
-      },
+      // subscription: {
+      //   select: {
+      //     id: true,
+      //     title: true,
+      //     price: true,
+      //   },
+      // },
       isApproved: true,
+      subscriptionId: true,
       subscriptionStart: true,
       subscriptionEnd: true,
     },
@@ -128,17 +134,14 @@ const updateProfileImg = async (
         profile: (await location).Location,
       },
     });
-  
+
     req.user.profile = location;
     return result;
   }
   throw new AppError(httpStatus.NOT_FOUND, 'Please provide image');
 };
 
-const updateMyProfileIntoDB = async (
-  id: string,
-  payload: Partial<User>,
-) => {
+const updateMyProfileIntoDB = async (id: string, payload: Partial<User>) => {
   delete payload.email;
 
   const result = await prisma.user.update({

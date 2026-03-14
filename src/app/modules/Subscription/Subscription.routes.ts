@@ -6,6 +6,7 @@ import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 // import { ensureApproved } from '../../middlewares/ensureApprove';
 import httpStatus from 'http-status';
+import { prisma } from '../../utils/prisma';
 
 const router = express.Router();
 
@@ -35,6 +36,24 @@ router.get(
 router.get('/:id', SubscriptionController.getSubscriptionById);
 //user-select subscription
 router.post('/buy-plan', auth(), SubscriptionController.updateInAppPlan);
+router.post(
+  '/cancel-plan',
+  auth(),
+  catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user.id;
+    const updateUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        subscriptionId: null,
+        subscriptionStart: null,
+        subscriptionEnd: null,
+        planPurchaseToken: null,
+        platform: null,
+      },
+    });
+    res.send(updateUser).json();
+  }),
+);
 // admin create subscription
 router.post('/', auth(UserRoleEnum.ADMIN), SubscriptionController.createIntoDb);
 router.put(
