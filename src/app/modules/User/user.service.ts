@@ -9,8 +9,8 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import { prisma } from '../../utils/prisma';
 import { Request } from 'express';
 import AppError from '../../errors/AppError';
-import { uploadToDigitalOceanAWS } from '../../utils/uploadToDigitalOceanAWS';
 import { uploadToCloudinary } from '../../utils/uploadToCloudinary';
+import { uploadToDigitalOcean } from '../../utils/uploadToDigitalOceanAWS';
 
 interface UserWithOptionalPassword extends Omit<User, 'password'> {
   password?: string;
@@ -123,8 +123,8 @@ const updateProfileImg = async (
   file: Express.Multer.File | undefined,
 ) => {
   if (file) {
-    // const location = uploadToDigitalOceanAWS(file);
-    const location = uploadToCloudinary(file);
+    const location = uploadToDigitalOcean(file);
+    // const location = uploadToCloudinary(file);
 
     const result = await prisma.user.update({
       where: {
@@ -357,8 +357,8 @@ const updateUserIntoDb = async (req: Request, id: string) => {
   let profileUrl: string | null = userInfo.profile;
 
   if (file) {
-    // const location = await uploadToDigitalOceanAWS(file);
-    const location = await uploadToCloudinary(file);
+    const location = await uploadToDigitalOcean(file);
+    // const location = await uploadToCloudinary(file);
     profileUrl = location.Location;
   }
 
