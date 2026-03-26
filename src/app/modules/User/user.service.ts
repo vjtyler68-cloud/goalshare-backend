@@ -25,7 +25,6 @@ const getAllUsersFromDB = async (query: any) => {
     .fields()
     .exclude()
     .paginate()
-    .include({ subscription: true })
     .execute();
   return result;
 };
