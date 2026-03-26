@@ -3,7 +3,7 @@ import app from './app';
 import config from './config';
 import seedSuperAdmin from './app/DB';
 import { setupWebSocket } from './app/middlewares/webSocket';
-import seedSubscriptions from './app/DB/db.plan';
+// import seedSubscriptions from './app/DB/db.plan';
 
 const port = config.port || 5000;
 
@@ -13,7 +13,7 @@ async function main() {
   server.listen(port, async () => {
     console.log('Server is running on port ', port);
     await seedSuperAdmin();
-    await seedSubscriptions();
+    // await seedSubscriptions();
 
     try {
       await setupWebSocket(server);

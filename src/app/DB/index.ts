@@ -5,7 +5,6 @@ import { prisma } from '../utils/prisma';
 
 const adminData = {
   fullName: 'Admin',
-  // email: 'prohero5500@gmail.com',
   email: 'admin@gmail.com',
   password: '123456',
   phoneNumber: '01821558090',
