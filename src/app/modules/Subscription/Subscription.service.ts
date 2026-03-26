@@ -5,7 +5,6 @@ import { PaymentStatus, SubscriptionType } from '@prisma/client';
 import AppError from '../../errors/AppError';
 import { stripe } from '../../utils/stripe';
 import Stripe from 'stripe';
-import { verifyAppleReceipt, verifyGooglePlayToken } from './verifyPlanToken';
 
 // Create Subscription
 const createIntoDb = async (req: Request) => {
@@ -308,35 +307,35 @@ const verifyToken = async (req: Request) => {
     throw new AppError(httpStatus.BAD_REQUEST, 'receipt required for iOS');
   }
 
-  // ── Verify ───────────────────────────────────────────────────────────────
-  if (platform === 'android') {
-    const { isValid, expiryTime } = await verifyGooglePlayToken(
-      productId,
-      purchaseToken,
-    );
+  // // ── Verify ───────────────────────────────────────────────────────────────
+  // if (platform === 'android') {
+  //   const { isValid, expiryTime } = await verifyGooglePlayToken(
+  //     productId,
+  //     purchaseToken,
+  //   );
 
-    if (!isValid) {
-      throw new AppError(
-        httpStatus.BAD_REQUEST,
-        'Invalid or expired Google Play purchase',
-      );
-    }
+  //   if (!isValid) {
+  //     throw new AppError(
+  //       httpStatus.BAD_REQUEST,
+  //       'Invalid or expired Google Play purchase',
+  //     );
+  //   }
 
-    return { isValid, expiryTime, platform };
-  }
+  //   return { isValid, expiryTime, platform };
+  // }
 
-  if (platform === 'ios') {
-    const { isValid, expiryTime } = await verifyAppleReceipt(receipt);
+  // if (platform === 'ios') {
+  //   const { isValid, expiryTime } = await verifyAppleReceipt(receipt);
 
-    if (!isValid) {
-      throw new AppError(
-        httpStatus.BAD_REQUEST,
-        'Invalid or expired Apple receipt',
-      );
-    }
+  //   if (!isValid) {
+  //     throw new AppError(
+  //       httpStatus.BAD_REQUEST,
+  //       'Invalid or expired Apple receipt',
+  //     );
+  //   }
 
-    return { isValid, expiryTime, platform };
-  }
+  //   return { isValid, expiryTime, platform };
+  // }
 };
 const updateInAppPurchasePlanData = async (req: Request) => {
   const userId = req.user.id;
