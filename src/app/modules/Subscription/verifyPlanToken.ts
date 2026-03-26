@@ -24,7 +24,7 @@ export const verifyGooglePlayToken = async (
     subscriptionId: productId,
     token: purchaseToken,
   });
-//   console.log({response})
+  console.log("clg")
 
 
   const purchase = response.data;
