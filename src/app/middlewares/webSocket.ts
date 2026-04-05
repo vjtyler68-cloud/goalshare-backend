@@ -528,7 +528,7 @@ export async function setupWebSocket(server: Server) {
               create: { groupId, userId: ws.userId, role: 'member' },
               update: {},
             });
-            console.log('Group member joined:', existing.id);
+            // console.log('Group member joined:', existing.id);
 
             ws.send(
               JSON.stringify({
