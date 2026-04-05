@@ -548,6 +548,23 @@ export async function setupWebSocket(server: Server) {
               return;
             }
 
+            const myRole = await prisma.groupMember.findFirst({
+              where: { groupId, userId: ws.userId },
+            });
+
+            if (myRole?.role === 'admin') {
+              const nextMember = await prisma.groupMember.findFirst({
+                where: { groupId, userId: { not: ws.userId } },
+              });
+
+              if (nextMember) {
+                await prisma.groupMember.update({
+                  where: { id: nextMember.id },
+                  data: { role: 'admin' },
+                });
+              }
+            }
+
             await prisma.groupMember.deleteMany({
               where: { groupId, userId: ws.userId },
             });

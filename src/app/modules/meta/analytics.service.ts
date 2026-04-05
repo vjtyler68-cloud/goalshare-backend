@@ -1,7 +1,6 @@
 import { PaymentStatus, UserRoleEnum, UserStatus } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import AppError from '../../errors/AppError';
-import { userRole } from '../../constant/index';
 
 const fetchDashboardMetaData = async (userId: string) => {
   // First, get the current user's role to ensure they are an ADMIN
@@ -14,18 +13,15 @@ const fetchDashboardMetaData = async (userId: string) => {
     throw new Error('Unauthorized access');
   }
 
-  // Calculate the key metrics
   const totalUsers = await prisma.user.count({
     where: { role: UserRoleEnum.USER },
   });
   const suspendedUsers = await prisma.user.count({
-    where: { role: UserRoleEnum.USER , status: UserStatus.SUSPENDED },
-  }); // Assuming you have a 'status' field
+    where: { role: UserRoleEnum.USER, status: UserStatus.SUSPENDED },
+  });
   const activeUsers = await prisma.user.count({
-    where: { role: UserRoleEnum.USER , status: UserStatus.ACTIVE },
-  }); // Or you can calculate this as total - suspended
-
-  // Fetch the income data for the graph (e.g., last 30 days)
+    where: { role: UserRoleEnum.USER, status: UserStatus.ACTIVE },
+  });
   const incomeData = await prisma.payment.groupBy({
     by: ['createdAt'],
     _sum: {
