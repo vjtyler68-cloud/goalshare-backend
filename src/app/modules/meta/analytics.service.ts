@@ -1,6 +1,7 @@
 import { PaymentStatus, UserRoleEnum, UserStatus } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import AppError from '../../errors/AppError';
+import { userRole } from '../../constant/index';
 
 const fetchDashboardMetaData = async (userId: string) => {
   // First, get the current user's role to ensure they are an ADMIN
@@ -14,12 +15,14 @@ const fetchDashboardMetaData = async (userId: string) => {
   }
 
   // Calculate the key metrics
-  const totalUsers = await prisma.user.count();
+  const totalUsers = await prisma.user.count({
+    where: { role: UserRoleEnum.USER },
+  });
   const suspendedUsers = await prisma.user.count({
-    where: { status: UserStatus.SUSPENDED },
+    where: { role: UserRoleEnum.USER , status: UserStatus.SUSPENDED },
   }); // Assuming you have a 'status' field
   const activeUsers = await prisma.user.count({
-    where: { status: UserStatus.ACTIVE },
+    where: { role: UserRoleEnum.USER , status: UserStatus.ACTIVE },
   }); // Or you can calculate this as total - suspended
 
   // Fetch the income data for the graph (e.g., last 30 days)
@@ -97,21 +100,21 @@ const getReportTableData = async (
     if (!isNaN(end.getTime())) dateFilter.lte = end;
   }
 
- const payments = await prisma.payment.findMany({
-   where: {
-     status: PaymentStatus.SUCCESS,
-     userId: { not: null },
-     ...(Object.keys(dateFilter).length && { createdAt: dateFilter }),
-   },
-   select: {
-     createdAt: true,
-     user: {
-       select: { fullName: true },
-     },
-     amount: true,
-   },
-   orderBy: { createdAt: 'asc' },
- });
+  const payments = await prisma.payment.findMany({
+    where: {
+      status: PaymentStatus.SUCCESS,
+      userId: { not: null },
+      ...(Object.keys(dateFilter).length && { createdAt: dateFilter }),
+    },
+    select: {
+      createdAt: true,
+      user: {
+        select: { fullName: true },
+      },
+      amount: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
 
   // Map the data to table structure
   const reportData = payments.map(payment => ({
