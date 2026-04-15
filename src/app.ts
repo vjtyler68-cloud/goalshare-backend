@@ -24,6 +24,7 @@ app.use(
     origin: [
       'http://localhost:3001',
       'http://localhost:3000',
+      "https://goalsharewin.com",
       'https://spanx-neworld-dashbaord.vercel.app',
       "http://209.97.152.119:3000"
     ],
