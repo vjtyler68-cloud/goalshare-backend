@@ -408,13 +408,12 @@ export async function setupWebSocket(server: Server) {
             const onlineUserList = Array.from(onlineUsers);
             const users = await prisma.user.findMany({
               where: { id: { in: onlineUserList } },
-              // MODIFIED: Added profile field
               select: {
                 id: true,
                 email: true,
                 role: true,
                 fullName: true,
-                profile: true, // Profile image URL
+                profile: true,
               },
             });
             ws.send(JSON.stringify({ event: 'onlineUsers', data: users }));

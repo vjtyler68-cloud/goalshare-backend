@@ -21,13 +21,20 @@ app.post(
 
 app.use(
   cors({
-    origin: [
-      'http://localhost:3001',
-      'http://localhost:3000',
-      "https://goalsharewin.com",
-      'https://spanx-neworld-dashbaord.vercel.app',
-      "http://209.97.152.119:3000"
-    ],
+    origin: (origin, callback) => {
+      const allowed = [
+        'http://localhost:3001',
+        'http://localhost:3000',
+        'https://goalsharewin.com',
+        'https://spanx-neworld-dashbaord.vercel.app',
+        'http://209.97.152.119:3000',
+      ];
+      if (!origin || allowed.includes(origin) || origin.startsWith('http://localhost:')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
