@@ -1,0 +1,20 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CommunityRoutes = void 0;
+const express_1 = __importDefault(require("express"));
+const community_controller_1 = require("./community.controller");
+const auth_1 = __importDefault(require("../../middlewares/auth"));
+const client_1 = require("@prisma/client");
+const fileUploader_1 = require("../../utils/fileUploader");
+const router = express_1.default.Router();
+router.get('/', community_controller_1.CommunityController.getAllCommunity);
+router.get('/all-community-users', (0, auth_1.default)(client_1.UserRoleEnum.USER), community_controller_1.CommunityController.getAllUsersForCommunityDB);
+router.get('/my-communities', (0, auth_1.default)(client_1.UserRoleEnum.USER), community_controller_1.CommunityController.getMyCommunities);
+router.get('/:id', community_controller_1.CommunityController.getCommunityById);
+router.post('/', (0, auth_1.default)(client_1.UserRoleEnum.USER), fileUploader_1.upload.single('file'), community_controller_1.CommunityController.createIntoDb);
+router.patch('/:id', community_controller_1.CommunityController.updateIntoDb);
+router.delete('/:id', community_controller_1.CommunityController.deleteIntoDb);
+exports.CommunityRoutes = router;
