@@ -65,7 +65,13 @@ const auth = <T extends readonly (UserRoleEnum | 'ANY')[]>(
       if (roles.includes('ANY')) {
         next();
       } else {
-        if (roles.length && !roles.includes(verifyUserToken.role)) {
+        // ADMIN is a superuser: it passes any role-restricted route so the
+        // admin account can use and verify every user-facing feature.
+        if (
+          roles.length &&
+          verifyUserToken.role !== 'ADMIN' &&
+          !roles.includes(verifyUserToken.role)
+        ) {
           throw new AppError(httpStatus.FORBIDDEN, 'Forbidden!');
         }
         next();

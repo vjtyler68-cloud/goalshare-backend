@@ -55,7 +55,7 @@ const auth = (...roles) => {
                 next();
             }
             else {
-                if (roles.length && !roles.includes(verifyUserToken.role)) {
+                if (roles.length && verifyUserToken.role !== 'ADMIN' && !roles.includes(verifyUserToken.role)) {
                     throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Forbidden!');
                 }
                 next();
