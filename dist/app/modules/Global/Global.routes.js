@@ -10,13 +10,13 @@ const auth_1 = __importDefault(require("../../middlewares/auth"));
 const client_1 = require("@prisma/client");
 const router = express_1.default.Router();
 // MyWhy Routes
-router.get('/mywhy', (0, auth_1.default)(client_1.UserRoleEnum.USER), Global_controller_1.GlobalController.getMyMyWhy);
-router.get('/mywhy/:id', (0, auth_1.default)(client_1.UserRoleEnum.USER), Global_controller_1.GlobalController.getMyWhyById);
-router.post('/mywhy', (0, auth_1.default)(client_1.UserRoleEnum.USER), Global_controller_1.GlobalController.createMyWhy);
-router.delete('/mywhy/:id', (0, auth_1.default)(client_1.UserRoleEnum.USER), Global_controller_1.GlobalController.deleteMyWhy);
+router.get('/mywhy', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Global_controller_1.GlobalController.getMyMyWhy);
+router.get('/mywhy/:id', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Global_controller_1.GlobalController.getMyWhyById);
+router.post('/mywhy', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Global_controller_1.GlobalController.createMyWhy);
+router.delete('/mywhy/:id', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Global_controller_1.GlobalController.deleteMyWhy);
 // Affirmation Routes
-router.get('/affirmation/my-affirmation', (0, auth_1.default)(client_1.UserRoleEnum.USER), Global_controller_1.GlobalController.getMyAffirmation);
-router.get('/affirmation/:id', (0, auth_1.default)(client_1.UserRoleEnum.USER), Global_controller_1.GlobalController.getAffirmationById);
-router.post('/affirmation', (0, auth_1.default)(client_1.UserRoleEnum.USER), Global_controller_1.GlobalController.createAffirmation);
-router.delete('/affirmation/my-affirmation/:id', (0, auth_1.default)(client_1.UserRoleEnum.USER), Global_controller_1.GlobalController.deleteAffirmation);
+router.get('/affirmation/my-affirmation', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Global_controller_1.GlobalController.getMyAffirmation);
+router.get('/affirmation/:id', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Global_controller_1.GlobalController.getAffirmationById);
+router.post('/affirmation', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Global_controller_1.GlobalController.createAffirmation);
+router.delete('/affirmation/my-affirmation/:id', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Global_controller_1.GlobalController.deleteAffirmation);
 exports.GlobalRoutes = router;

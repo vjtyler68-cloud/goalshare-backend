@@ -6,16 +6,16 @@ import { UserRoleEnum } from '@prisma/client';
 const router = express.Router();
 
 // MyWhy Routes
-router.get('/mywhy', auth(UserRoleEnum.USER), GlobalController.getMyMyWhy);
+router.get('/mywhy', auth(UserRoleEnum.USER, UserRoleEnum.ADMIN), GlobalController.getMyMyWhy);
 router.get(
   '/mywhy/:id',
-  auth(UserRoleEnum.USER),
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
   GlobalController.getMyWhyById,
 );
-router.post('/mywhy', auth(UserRoleEnum.USER), GlobalController.createMyWhy);
+router.post('/mywhy', auth(UserRoleEnum.USER, UserRoleEnum.ADMIN), GlobalController.createMyWhy);
 router.delete(
   '/mywhy/:id',
-  auth(UserRoleEnum.USER),
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
   GlobalController.deleteMyWhy,
 );
 
@@ -23,22 +23,22 @@ router.delete(
 
 router.get(
   '/affirmation/my-affirmation',
-  auth(UserRoleEnum.USER),
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
   GlobalController.getMyAffirmation,
 );
 router.get(
   '/affirmation/:id',
-  auth(UserRoleEnum.USER),
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
   GlobalController.getAffirmationById,
 );
 router.post(
   '/affirmation',
-  auth(UserRoleEnum.USER),
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
   GlobalController.createAffirmation,
 );
 router.delete(
   '/affirmation/my-affirmation/:id',
-  auth(UserRoleEnum.USER),
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
   GlobalController.deleteAffirmation,
 );
 
