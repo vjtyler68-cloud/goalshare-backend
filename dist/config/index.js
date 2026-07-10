@@ -13,6 +13,9 @@ exports.default = {
     bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,
     mail: process.env.MAIL,
     mail_password: process.env.MAIL_PASS,
+    mail_host: process.env.MAIL_HOST,
+    mail_port: process.env.MAIL_PORT,
+    mail_from: process.env.MAIL_FROM,
     base_url_server: process.env.BASE_URL_SERVER,
     base_url_client: process.env.BASE_URL_CLIENT,
     jwt: {

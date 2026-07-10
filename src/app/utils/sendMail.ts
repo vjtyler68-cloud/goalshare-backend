@@ -28,14 +28,14 @@ import config from '../../config';
 
 export const sendEmail = async (to: string, html: string, subject: string) => {
   try {
-    // The MAIL/MAIL_PASS credentials are Brevo (login is *@smtp-brevo.com), so the
-    // transport MUST point at Brevo's relay — NOT smtp.gmail.com. Gmail's server
-    // rejected the Brevo login on every send, which (with the empty catch below)
-    // silently killed all OTP + password-reset emails. Timeouts added so a bad
-    // connection can never hang the whole signup/reset request again.
+    // Fully env-driven transport (MAIL_HOST/MAIL_PORT/MAIL/MAIL_PASS/MAIL_FROM) so
+    // switching email providers never needs a code change again. History: the host
+    // was hardcoded to smtp.gmail.com while the creds were Brevo (silent auth fail),
+    // and then the Brevo creds themselves turned out to be revoked (535). Timeouts
+    // keep a bad connection from hanging the whole signup/reset request.
     const transporter = nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: 587,
+      host: config.mail_host || 'smtp.gmail.com',
+      port: Number(config.mail_port) || 587,
       secure: false,
       auth: {
         user: config.mail,
@@ -46,7 +46,7 @@ export const sendEmail = async (to: string, html: string, subject: string) => {
       socketTimeout: 15000,
     });
     const result = await transporter.sendMail({
-      from: `<smt.team.pixel@gmail.com>`,
+      from: config.mail_from || config.mail,
       to,
       subject,
       text: '',

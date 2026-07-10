@@ -41,8 +41,8 @@ const config_1 = __importDefault(require("../../config"));
 const sendEmail = (to, html, subject) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const transporter = nodemailer_1.default.createTransport({
-            host: 'smtp-relay.brevo.com',
-            port: 587,
+            host: config_1.default.mail_host || 'smtp.gmail.com',
+            port: Number(config_1.default.mail_port) || 587,
             secure: false,
             auth: {
                 user: config_1.default.mail,
@@ -53,7 +53,7 @@ const sendEmail = (to, html, subject) => __awaiter(void 0, void 0, void 0, funct
             socketTimeout: 15000,
         });
         const result = yield transporter.sendMail({
-            from: `<smt.team.pixel@gmail.com>`,
+            from: config_1.default.mail_from || config_1.default.mail,
             to,
             subject,
             text: '',
