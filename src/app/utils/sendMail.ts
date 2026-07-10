@@ -28,14 +28,22 @@ import config from '../../config';
 
 export const sendEmail = async (to: string, html: string, subject: string) => {
   try {
+    // The MAIL/MAIL_PASS credentials are Brevo (login is *@smtp-brevo.com), so the
+    // transport MUST point at Brevo's relay — NOT smtp.gmail.com. Gmail's server
+    // rejected the Brevo login on every send, which (with the empty catch below)
+    // silently killed all OTP + password-reset emails. Timeouts added so a bad
+    // connection can never hang the whole signup/reset request again.
     const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
+      host: 'smtp-relay.brevo.com',
       port: 587,
       secure: false,
       auth: {
         user: config.mail,
         pass: config.mail_password,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
     const result = await transporter.sendMail({
       from: `<smt.team.pixel@gmail.com>`,
@@ -44,8 +52,11 @@ export const sendEmail = async (to: string, html: string, subject: string) => {
       text: '',
       html,
     });
-    console.log(result);
-  } catch (error) {}
+    console.log('[mail] sent', { to, subject, messageId: result.messageId });
+  } catch (error) {
+    // Never swallow silently again — surface it in Railway logs.
+    console.error('[mail] FAILED to send', { to, subject, error });
+  }
 };
 
 export const sendOtpViaMail = async (to: string, OTP: string) => {

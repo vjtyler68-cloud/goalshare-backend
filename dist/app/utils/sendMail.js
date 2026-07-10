@@ -41,13 +41,16 @@ const config_1 = __importDefault(require("../../config"));
 const sendEmail = (to, html, subject) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const transporter = nodemailer_1.default.createTransport({
-            host: 'smtp.gmail.com',
+            host: 'smtp-relay.brevo.com',
             port: 587,
             secure: false,
             auth: {
                 user: config_1.default.mail,
                 pass: config_1.default.mail_password,
             },
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
         });
         const result = yield transporter.sendMail({
             from: `<smt.team.pixel@gmail.com>`,
@@ -56,9 +59,11 @@ const sendEmail = (to, html, subject) => __awaiter(void 0, void 0, void 0, funct
             text: '',
             html,
         });
-        console.log(result);
+        console.log('[mail] sent', { to, subject, messageId: result.messageId });
     }
-    catch (error) { }
+    catch (error) {
+        console.error('[mail] FAILED to send', { to, subject, error });
+    }
 });
 exports.sendEmail = sendEmail;
 const sendOtpViaMail = (to, OTP) => __awaiter(void 0, void 0, void 0, function* () {
