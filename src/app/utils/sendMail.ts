@@ -27,6 +27,38 @@ import config from '../../config';
 // };
 
 export const sendEmail = async (to: string, html: string, subject: string) => {
+  const from = config.mail_from || config.mail;
+  // Preferred path: Brevo HTTP API over HTTPS:443. Railway blocks outbound SMTP
+  // ports on Trial/Hobby plans (every send died with ETIMEDOUT on CONN), but it
+  // cannot block plain HTTPS — so when BREVO_API_KEY is set we send via the API.
+  if (config.brevo_api_key) {
+    try {
+      const res = await (globalThis as any).fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': config.brevo_api_key,
+          'Content-Type': 'application/json',
+          accept: 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { email: from, name: 'GoalShare' },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+        }),
+      });
+      const body = await res.text();
+      if (res.ok) {
+        console.log('[mail] sent via Brevo API', { to, subject, body });
+      } else {
+        console.error('[mail] Brevo API FAILED', { to, subject, status: res.status, body });
+      }
+    } catch (error) {
+      console.error('[mail] Brevo API FAILED', { to, subject, error });
+    }
+    return;
+  }
+  // Fallback: SMTP (only usable on hosts that allow outbound SMTP).
   try {
     // Fully env-driven transport (MAIL_HOST/MAIL_PORT/MAIL/MAIL_PASS/MAIL_FROM) so
     // switching email providers never needs a code change again. History: the host
