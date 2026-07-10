@@ -40,9 +40,37 @@ const config_1 = __importDefault(require("../../config"));
 // };
 const sendEmail = (to, html, subject) => __awaiter(void 0, void 0, void 0, function* () {
     const from = config_1.default.mail_from || config_1.default.mail;
-    // Preferred path: Brevo HTTP API over HTTPS:443. Railway blocks outbound SMTP
-    // ports on Trial/Hobby plans (every send died with ETIMEDOUT on CONN), but it
-    // cannot block plain HTTPS — so when BREVO_API_KEY is set we send via the API.
+    // HTTP APIs over HTTPS:443 are the preferred paths — Railway blocks outbound
+    // SMTP ports on Trial/Hobby plans (every send died with ETIMEDOUT on CONN),
+    // but it cannot block plain HTTPS. Priority: Resend → Brevo → SMTP fallback.
+    if (config_1.default.resend_api_key) {
+        try {
+            const res = yield fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${config_1.default.resend_api_key}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    from: `GoalShare <${from}>`,
+                    to: [to],
+                    subject,
+                    html,
+                }),
+            });
+            const body = yield res.text();
+            if (res.ok) {
+                console.log('[mail] sent via Resend API', { to, subject, body });
+            }
+            else {
+                console.error('[mail] Resend API FAILED', { to, subject, status: res.status, body });
+            }
+        }
+        catch (error) {
+            console.error('[mail] Resend API FAILED', { to, subject, error });
+        }
+        return;
+    }
     if (config_1.default.brevo_api_key) {
         try {
             const res = yield fetch('https://api.brevo.com/v3/smtp/email', {
