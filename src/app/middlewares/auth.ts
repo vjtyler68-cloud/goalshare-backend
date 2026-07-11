@@ -50,7 +50,12 @@ const auth = <T extends readonly (UserRoleEnum | 'ANY')[]>(
       // if (!user.isApproved) {
       //   throw new AppError(httpStatus.UNAUTHORIZED, 'You are not approved by admin!');
       // }
-      if (!user.isEmailVerified) {
+      // Test mode (AUTO_VERIFY_SIGNUPS): don't block unverified TestFlight
+      // testers on authenticated routes. Remove the env var before public launch.
+      if (
+        !user.isEmailVerified &&
+        process.env.AUTO_VERIFY_SIGNUPS !== 'true'
+      ) {
         throw new AppError(httpStatus.UNAUTHORIZED, 'You are not verified!');
       }
       if (user.status === UserStatus.SUSPENDED) {

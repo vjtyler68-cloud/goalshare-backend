@@ -41,7 +41,9 @@ const auth = (...roles) => {
             // if (!user.isApproved) {
             //   throw new AppError(httpStatus.UNAUTHORIZED, 'You are not approved by admin!');
             // }
-            if (!user.isEmailVerified) {
+            // Test mode (AUTO_VERIFY_SIGNUPS): don't block unverified TestFlight
+            // testers on authenticated routes. Remove the env var before launch.
+            if (!user.isEmailVerified && process.env.AUTO_VERIFY_SIGNUPS !== 'true') {
                 throw new AppError_1.default(http_status_1.default.UNAUTHORIZED, 'You are not verified!');
             }
             if (user.status === client_1.UserStatus.SUSPENDED) {

@@ -208,6 +208,7 @@ const registerWithOtpIntoDB = async (payload: User) => {
     // REMOVE (turn the env var off) before public launch so real subscriptions apply.
     ...(isTestOtpMode()
       ? {
+          isEmailVerified: true,
           subscriptionStart: new Date(),
           subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'),
           hasUsedFree: true,
