@@ -8,12 +8,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateOtpEmail = void 0;
-const nodemailer_1 = __importDefault(require("nodemailer"));
+const sendMail_1 = require("./sendMail");
 const generateOtpEmail = (otp) => {
     return `
       <div style="font-family: Arial, sans-serif; color: #333; padding: 30px; background: linear-gradient(135deg, #6c63ff, #3f51b5); border-radius: 8px;">
@@ -45,30 +42,13 @@ const generateOtpEmail = (otp) => {
       </div>`;
 };
 exports.generateOtpEmail = generateOtpEmail;
+// Delegates to the single hardened mailer in sendMail.js. The old inline
+// transport hardcoded dead Brevo creds on SMTP port 2525 (Railway blocks it)
+// with NO timeout, so an unverified-user login hung forever on the OTP email.
+// sendEmail() uses HTTP email APIs with SMTP fallback, has timeouts, and never
+// throws — login/registration can never hang on email again.
 const emailSender = (to, html, subject) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const transporter = nodemailer_1.default.createTransport({
-            host: 'smtp-relay.brevo.com',
-            port: 2525,
-            secure: false,
-            auth: {
-                user: '88803c001@smtp-brevo.com',
-                pass: 'OzqM8PBhVxbNYEUt',
-            },
-        });
-        const mailOptions = {
-            from: '<akonhasan680@gmail.com>',
-            to,
-            subject,
-            text: html.replace(/<[^>]+>/g, ''),
-            html,
-        };
-        // Send the email
-        const info = yield transporter.sendMail(mailOptions);
-        return info.messageId;
-    }
-    catch (error) {
-        throw new Error('Failed to send email. Please try again later.');
-    }
+    yield (0, sendMail_1.sendEmail)(to, html, subject);
+    return 'queued';
 });
 exports.default = emailSender;

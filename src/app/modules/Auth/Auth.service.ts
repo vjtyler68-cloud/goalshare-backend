@@ -128,12 +128,14 @@ const loginWithOtpFromDB = async (
     throw new AppError(httpStatus.UNAUTHORIZED, 'You are deleted !');
   }
 
-  if (userData.role !== UserRoleEnum.ADMIN && !userData.isEmailVerified) {
-    // Test mode (AUTO_VERIFY_SIGNUPS=true): static code so testers can verify
-    // without working email delivery.
-    const otp: number = isTestOtpMode()
-      ? 123456
-      : Math.floor(100000 + Math.random() * 900000);
+  if (
+    userData.role !== UserRoleEnum.ADMIN &&
+    !userData.isEmailVerified &&
+    // Test mode (AUTO_VERIFY_SIGNUPS=true): treat everyone as verified so
+    // testers can log in directly without any email round-trip.
+    !isTestOtpMode()
+  ) {
+    const otp: number = Math.floor(100000 + Math.random() * 900000);
 
     await prisma.user.update({
       where: { email: userData.email },

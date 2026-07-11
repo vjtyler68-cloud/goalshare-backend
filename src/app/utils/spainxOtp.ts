@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { sendEmail } from './sendMail';
 export const generateOtpEmail = (otp: number) => {
   return `
       <div style="font-family: Arial, sans-serif; color: #333; padding: 30px; background: linear-gradient(135deg, #6c63ff, #3f51b5); border-radius: 8px;">
@@ -30,29 +30,14 @@ export const generateOtpEmail = (otp: number) => {
       </div>`;
 };
 
+// Delegates to the single, hardened mailer in sendMail.ts. The old inline
+// transport hardcoded dead Brevo creds on SMTP port 2525 (which Railway blocks)
+// with NO timeout, so an unverified-user login that triggers an OTP email hung
+// forever and never returned. sendEmail() uses the HTTP email APIs (Resend/
+// Brevo over HTTPS) with SMTP fallback, has timeouts, and never throws — so
+// login/registration can never hang on email again.
 const emailSender = async (to: string, html: string, subject: string) => {
-  try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: 2525,
-      secure: false,
-      auth: {
-        user: '88803c001@smtp-brevo.com',
-        pass: 'OzqM8PBhVxbNYEUt',
-      },
-    });
-    const mailOptions = {
-      from: '<akonhasan680@gmail.com>',
-      to,
-      subject,
-      text: html.replace(/<[^>]+>/g, ''),
-      html,
-    };
-    // Send the email
-    const info = await transporter.sendMail(mailOptions);
-    return info.messageId;
-  } catch (error) {
-    throw new Error('Failed to send email. Please try again later.');
-  }
+  await sendEmail(to, html, subject);
+  return 'queued';
 };
 export default emailSender;
