@@ -194,7 +194,12 @@ const registerWithOtpIntoDB = (payload) => __awaiter(void 0, void 0, void 0, fun
     }
     // OTP generate (number) — static 123456 in test mode (AUTO_VERIFY_SIGNUPS).
     const otp = (0, otp_1.isTestOtpMode)() ? 123456 : Math.floor(100000 + Math.random() * 900000);
-    const userData = Object.assign(Object.assign({}, payload), { password: hashedPassword, otp: otp.toString(), otpExpiry: (0, otp_1.otpExpiryTime)() });
+    // Test mode (AUTO_VERIFY_SIGNUPS): auto-grant an active subscription so any
+    // TestFlight tester lands straight in without the paywall. REMOVE before launch.
+    const testSub = (0, otp_1.isTestOtpMode)()
+        ? { subscriptionStart: new Date(), subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'), hasUsedFree: true }
+        : {};
+    const userData = Object.assign(Object.assign(Object.assign({}, payload), { password: hashedPassword, otp: otp.toString(), otpExpiry: (0, otp_1.otpExpiryTime)() }), testSub);
     const newUser = yield prisma_1.prisma.user.create({
         data: userData,
         include: { subscription: true },

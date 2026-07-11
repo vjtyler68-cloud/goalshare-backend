@@ -203,6 +203,16 @@ const registerWithOtpIntoDB = async (payload: User) => {
     password: hashedPassword,
     otp: otp.toString(),
     otpExpiry: otpExpiryTime(),
+    // Test mode (AUTO_VERIFY_SIGNUPS): auto-grant an active subscription so any
+    // TestFlight tester lands straight in the app without the paywall.
+    // REMOVE (turn the env var off) before public launch so real subscriptions apply.
+    ...(isTestOtpMode()
+      ? {
+          subscriptionStart: new Date(),
+          subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'),
+          hasUsedFree: true,
+        }
+      : {}),
   };
 
   const newUser = await prisma.user.create({
