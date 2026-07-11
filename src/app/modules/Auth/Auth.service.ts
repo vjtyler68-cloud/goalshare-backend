@@ -9,6 +9,7 @@ import { Response } from 'express';
 import {
   generateOTP,
   getOtpStatusMessage,
+  isTestOtpMode,
   otpExpiryTime,
 } from '../../utils/otp';
 
@@ -128,7 +129,11 @@ const loginWithOtpFromDB = async (
   }
 
   if (userData.role !== UserRoleEnum.ADMIN && !userData.isEmailVerified) {
-    const otp: number = Math.floor(100000 + Math.random() * 900000);
+    // Test mode (AUTO_VERIFY_SIGNUPS=true): static code so testers can verify
+    // without working email delivery.
+    const otp: number = isTestOtpMode()
+      ? 123456
+      : Math.floor(100000 + Math.random() * 900000);
 
     await prisma.user.update({
       where: { email: userData.email },
@@ -187,8 +192,10 @@ const registerWithOtpIntoDB = async (payload: User) => {
     throw new AppError(httpStatus.CONFLICT, 'User already exists');
   }
 
-  // OTP generate (number)
-  const otp: number = Math.floor(100000 + Math.random() * 900000);
+  // OTP generate (number) — static 123456 in test mode (AUTO_VERIFY_SIGNUPS).
+  const otp: number = isTestOtpMode()
+    ? 123456
+    : Math.floor(100000 + Math.random() * 900000);
   const userData: User = {
     ...payload,
     password: hashedPassword,

@@ -1,4 +1,13 @@
+/// TEST MODE: while the email provider isn't live yet, setting the env var
+/// AUTO_VERIFY_SIGNUPS=true makes every verification code the static 123456
+/// (and skips nothing else) so TestFlight testers can sign up without
+/// receiving email. REMOVE THE ENV VAR BEFORE PUBLIC LAUNCH.
+export function isTestOtpMode(): boolean {
+    return process.env.AUTO_VERIFY_SIGNUPS === 'true';
+}
+
 export function generateOTP(): string {
+    if (isTestOtpMode()) return '123456';
     const otp = Math.floor(Math.random() * 1000000);
     return otp.toString().padStart(6, '0');
 }

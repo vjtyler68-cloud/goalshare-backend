@@ -141,7 +141,8 @@ const loginWithOtpFromDB = (res, payload) => __awaiter(void 0, void 0, void 0, f
         throw new AppError_1.default(http_status_1.default.UNAUTHORIZED, 'You are deleted !');
     }
     if (userData.role !== client_1.UserRoleEnum.ADMIN && !userData.isEmailVerified) {
-        const otp = Math.floor(100000 + Math.random() * 900000);
+        // Test mode (AUTO_VERIFY_SIGNUPS=true): static code, no email needed.
+        const otp = (0, otp_1.isTestOtpMode)() ? 123456 : Math.floor(100000 + Math.random() * 900000);
         yield prisma_1.prisma.user.update({
             where: { email: userData.email },
             data: {
@@ -189,8 +190,8 @@ const registerWithOtpIntoDB = (payload) => __awaiter(void 0, void 0, void 0, fun
     if (isUserExistWithTheGmail === null || isUserExistWithTheGmail === void 0 ? void 0 : isUserExistWithTheGmail.id) {
         throw new AppError_1.default(http_status_1.default.CONFLICT, 'User already exists');
     }
-    // OTP generate (number)
-    const otp = Math.floor(100000 + Math.random() * 900000);
+    // OTP generate (number) — static 123456 in test mode (AUTO_VERIFY_SIGNUPS).
+    const otp = (0, otp_1.isTestOtpMode)() ? 123456 : Math.floor(100000 + Math.random() * 900000);
     const userData = Object.assign(Object.assign({}, payload), { password: hashedPassword, otp: otp.toString(), otpExpiry: (0, otp_1.otpExpiryTime)() });
     const newUser = yield prisma_1.prisma.user.create({
         data: userData,
@@ -394,7 +395,7 @@ const forgetPassword = (email) => __awaiter(void 0, void 0, void 0, function* ()
         const message = (0, otp_1.getOtpStatusMessage)(userData.otpExpiry);
         throw new AppError_1.default(http_status_1.default.CONFLICT, message);
     }
-    const otp = Math.floor(100000 + Math.random() * 900000);
+    const otp = (0, otp_1.isTestOtpMode)() ? 123456 : Math.floor(100000 + Math.random() * 900000);
     const expireTime = (0, otp_1.otpExpiryTime)();
     try {
         yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
