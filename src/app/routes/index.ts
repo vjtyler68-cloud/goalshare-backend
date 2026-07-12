@@ -12,6 +12,7 @@ import { GoalRoutes } from '../modules/goal/goal.routes';
 import { BudgetRoutes } from '../modules/budget/budget.routes';
 import { PaymentRoutes } from '../modules/Payment/payment.route';
 import { GlobalRoutes } from '../modules/Global/Global.routes';
+import { LeadsRoutes } from '../modules/Leads/Leads.routes';
 
 const router = express.Router();
 
@@ -67,6 +68,10 @@ const moduleRoutes = [
   {
     path: '/global',
     route: GlobalRoutes,
+  },
+  {
+    path: '/leads',
+    route: LeadsRoutes,
   },
 ];
 

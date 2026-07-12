@@ -17,6 +17,7 @@ const goal_routes_1 = require("../modules/goal/goal.routes");
 const budget_routes_1 = require("../modules/budget/budget.routes");
 const payment_route_1 = require("../modules/Payment/payment.route");
 const Global_routes_1 = require("../modules/Global/Global.routes");
+const Leads_routes_1 = require("../modules/Leads/Leads.routes");
 const router = express_1.default.Router();
 const moduleRoutes = [
     {
@@ -70,6 +71,10 @@ const moduleRoutes = [
     {
         path: '/global',
         route: Global_routes_1.GlobalRoutes,
+    },
+    {
+        path: '/leads',
+        route: Leads_routes_1.LeadsRoutes,
     },
 ];
 moduleRoutes.forEach(route => router.use(route.path, route.route));
