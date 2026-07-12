@@ -1,0 +1,16 @@
+// Self-hosted crash telemetry (no third-party SDK/account needed). The app
+// posts a small report when it hits a fatal Flutter error; ops reads them
+// straight from Mongo. Reports may arrive pre-login, so userId is optional.
+model CrashReport {
+    id String @id @default(auto()) @map("_id") @db.ObjectId
+
+    error      String
+    stack      String @default("")
+    appVersion String @default("")
+    platform   String @default("")
+    userId     String @default("")
+
+    createdAt DateTime @default(now())
+
+    @@map("crashReport")
+}

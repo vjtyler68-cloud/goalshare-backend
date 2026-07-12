@@ -13,6 +13,7 @@ import { BudgetRoutes } from '../modules/budget/budget.routes';
 import { PaymentRoutes } from '../modules/Payment/payment.route';
 import { GlobalRoutes } from '../modules/Global/Global.routes';
 import { LeadsRoutes } from '../modules/Leads/Leads.routes';
+import { DataRoutes } from '../modules/Data/Data.routes';
 
 const router = express.Router();
 
@@ -72,6 +73,10 @@ const moduleRoutes = [
   {
     path: '/leads',
     route: LeadsRoutes,
+  },
+  {
+    path: '/data',
+    route: DataRoutes,
   },
 ];
 
