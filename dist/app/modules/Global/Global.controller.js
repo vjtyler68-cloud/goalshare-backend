@@ -46,6 +46,17 @@ const getMyWhyById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         data: result,
     });
 }));
+const updateMyWhy = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    const result = yield Global_service_1.GlobalServices.updateMyWhy(req.user.id, id, (_a = req.body) === null || _a === void 0 ? void 0 : _a.text);
+    (0, sendResponse_1.default)(res, {
+        statusCode: result ? http_status_1.default.OK : http_status_1.default.NOT_FOUND,
+        success: !!result,
+        message: result ? 'Successfully updated MyWhy' : 'MyWhy not found or empty text',
+        data: result,
+    });
+}));
 const deleteMyWhy = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const result = yield Global_service_1.GlobalServices.deleteMyWhy(req.user.id, id);
@@ -85,6 +96,17 @@ const getAffirmationById = (0, catchAsync_1.default)((req, res) => __awaiter(voi
         data: result,
     });
 }));
+const updateAffirmation = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    const result = yield Global_service_1.GlobalServices.updateAffirmation(req.user.id, id, (_a = req.body) === null || _a === void 0 ? void 0 : _a.text);
+    (0, sendResponse_1.default)(res, {
+        statusCode: result ? http_status_1.default.OK : http_status_1.default.NOT_FOUND,
+        success: !!result,
+        message: result ? 'Successfully updated Affirmation' : 'Affirmation not found or empty text',
+        data: result,
+    });
+}));
 const deleteAffirmation = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const result = yield Global_service_1.GlobalServices.deleteAffirmation(req.user.id, id);
@@ -100,10 +122,12 @@ exports.GlobalController = {
     createMyWhy,
     getMyMyWhy,
     getMyWhyById,
+    updateMyWhy,
     deleteMyWhy,
     // Affirmation
     createAffirmation,
     getMyAffirmation,
     getAffirmationById,
+    updateAffirmation,
     deleteAffirmation,
 };

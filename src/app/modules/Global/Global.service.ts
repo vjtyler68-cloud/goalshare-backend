@@ -87,6 +87,34 @@ const getMyWhyById = async (
   return null;
 };
 
+const updateMyWhy = async (
+  userId: string,
+  id: string,
+  text: string,
+): Promise<MyWhyItem | null> => {
+  if (!text || !text.trim()) return null;
+
+  // Ownership check mirrors deleteMyWhy: only the owner may edit.
+  const existing = await prisma.globalMyWhy.findUnique({
+    where: { id },
+    select: { userId: true },
+  });
+  if (!existing || existing.userId !== userId) return null;
+
+  const result = await prisma.globalMyWhy.update({
+    where: { id },
+    data: { text: text.trim() },
+    select: {
+      id: true,
+      text: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return result;
+};
+
 const deleteMyWhy = async (
   userId: string,
   id: string,
@@ -180,6 +208,34 @@ const getAffirmationById = async (
   return null;
 };
 
+const updateAffirmation = async (
+  userId: string,
+  id: string,
+  text: string,
+): Promise<AffirmationItem | null> => {
+  if (!text || !text.trim()) return null;
+
+  // Ownership check mirrors deleteAffirmation: only the owner may edit.
+  const existing = await prisma.globalAffirmation.findUnique({
+    where: { id },
+    select: { userId: true },
+  });
+  if (!existing || existing.userId !== userId) return null;
+
+  const result = await prisma.globalAffirmation.update({
+    where: { id },
+    data: { text: text.trim() },
+    select: {
+      id: true,
+      text: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return result;
+};
+
 const deleteAffirmation = async (
   userId: string,
   id: string,
@@ -206,10 +262,12 @@ export const GlobalServices = {
   createMyWhy,
   getAllMyWhy,
   getMyWhyById,
+  updateMyWhy,
   deleteMyWhy,
   // Affirmation
   createAffirmation,
   getAllAffirmation,
   getAffirmationById,
+  updateAffirmation,
   deleteAffirmation,
 };

@@ -79,6 +79,28 @@ const getMyWhyById = (userId, id) => __awaiter(void 0, void 0, void 0, function*
     }
     return null;
 });
+const updateMyWhy = (userId, id, text) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!text || !text.trim())
+        return null;
+    // Ownership check mirrors deleteMyWhy: only the owner may edit.
+    const existing = yield prisma.globalMyWhy.findUnique({
+        where: { id },
+        select: { userId: true },
+    });
+    if (!existing || existing.userId !== userId)
+        return null;
+    const result = yield prisma.globalMyWhy.update({
+        where: { id },
+        data: { text: text.trim() },
+        select: {
+            id: true,
+            text: true,
+            createdAt: true,
+            updatedAt: true,
+        },
+    });
+    return result;
+});
 const deleteMyWhy = (userId, id) => __awaiter(void 0, void 0, void 0, function* () {
     const existing = yield prisma.globalMyWhy.findUnique({
         where: { id },
@@ -150,6 +172,28 @@ const getAffirmationById = (userId, id) => __awaiter(void 0, void 0, void 0, fun
     }
     return null;
 });
+const updateAffirmation = (userId, id, text) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!text || !text.trim())
+        return null;
+    // Ownership check mirrors deleteAffirmation: only the owner may edit.
+    const existing = yield prisma.globalAffirmation.findUnique({
+        where: { id },
+        select: { userId: true },
+    });
+    if (!existing || existing.userId !== userId)
+        return null;
+    const result = yield prisma.globalAffirmation.update({
+        where: { id },
+        data: { text: text.trim() },
+        select: {
+            id: true,
+            text: true,
+            createdAt: true,
+            updatedAt: true,
+        },
+    });
+    return result;
+});
 const deleteAffirmation = (userId, id) => __awaiter(void 0, void 0, void 0, function* () {
     const existing = yield prisma.globalAffirmation.findUnique({
         where: { id },
@@ -170,10 +214,12 @@ exports.GlobalServices = {
     createMyWhy,
     getAllMyWhy,
     getMyWhyById,
+    updateMyWhy,
     deleteMyWhy,
     // Affirmation
     createAffirmation,
     getAllAffirmation,
     getAffirmationById,
+    updateAffirmation,
     deleteAffirmation,
 };

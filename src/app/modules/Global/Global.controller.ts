@@ -36,6 +36,23 @@ const getMyWhyById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updateMyWhy = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await GlobalServices.updateMyWhy(
+    req.user.id,
+    id,
+    req.body?.text,
+  );
+  sendResponse(res, {
+    statusCode: result ? httpStatus.OK : httpStatus.NOT_FOUND,
+    success: !!result,
+    message: result
+      ? 'Successfully updated MyWhy'
+      : 'MyWhy not found or empty text',
+    data: result,
+  });
+});
+
 const deleteMyWhy = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const result = await GlobalServices.deleteMyWhy(req.user.id, id);
@@ -81,6 +98,23 @@ const getAffirmationById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updateAffirmation = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await GlobalServices.updateAffirmation(
+    req.user.id,
+    id,
+    req.body?.text,
+  );
+  sendResponse(res, {
+    statusCode: result ? httpStatus.OK : httpStatus.NOT_FOUND,
+    success: !!result,
+    message: result
+      ? 'Successfully updated Affirmation'
+      : 'Affirmation not found or empty text',
+    data: result,
+  });
+});
+
 const deleteAffirmation = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const result = await GlobalServices.deleteAffirmation(req.user.id, id);
@@ -97,10 +131,12 @@ export const GlobalController = {
   createMyWhy,
   getMyMyWhy,
   getMyWhyById,
+  updateMyWhy,
   deleteMyWhy,
   // Affirmation
   createAffirmation,
   getMyAffirmation,
   getAffirmationById,
+  updateAffirmation,
   deleteAffirmation,
 };

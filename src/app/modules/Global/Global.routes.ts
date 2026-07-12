@@ -13,6 +13,11 @@ router.get(
   GlobalController.getMyWhyById,
 );
 router.post('/mywhy', auth(UserRoleEnum.USER, UserRoleEnum.ADMIN), GlobalController.createMyWhy);
+router.patch(
+  '/mywhy/:id',
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
+  GlobalController.updateMyWhy,
+);
 router.delete(
   '/mywhy/:id',
   auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
@@ -35,6 +40,11 @@ router.post(
   '/affirmation',
   auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
   GlobalController.createAffirmation,
+);
+router.patch(
+  '/affirmation/my-affirmation/:id',
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
+  GlobalController.updateAffirmation,
 );
 router.delete(
   '/affirmation/my-affirmation/:id',
