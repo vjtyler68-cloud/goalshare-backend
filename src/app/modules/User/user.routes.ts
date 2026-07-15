@@ -1,6 +1,7 @@
 import express from 'express';
 import auth from '../../middlewares/auth';
 import { UserControllers } from './user.controller';
+import { UsernameControllers } from './username.controller';
 import validateRequest from '../../middlewares/validateRequest';
 import { userValidation } from './user.validation';
 import { upload } from '../../utils/fileUploader';
@@ -24,6 +25,10 @@ router.get(
   auth(UserRoleEnum.ADMIN, UserRoleEnum.USER),
   UserControllers.getMyProfile,
 );
+// Username routes — declared BEFORE '/:id' so the literal paths win.
+router.get('/search-users', auth('ANY'), UsernameControllers.searchUsers);
+router.put('/username', auth('ANY'), UsernameControllers.setUsername);
+
 router.get('/:id', auth('ANY'), UserControllers.getUserDetails);
 
 router.delete('/soft-delete', auth('ANY'), UserControllers.softDeleteUser);

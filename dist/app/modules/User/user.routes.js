@@ -7,6 +7,7 @@ exports.UserRouters = void 0;
 const express_1 = __importDefault(require("express"));
 const auth_1 = __importDefault(require("../../middlewares/auth"));
 const user_controller_1 = require("./user.controller");
+const username_controller_1 = require("./username.controller");
 const validateRequest_1 = __importDefault(require("../../middlewares/validateRequest"));
 const user_validation_1 = require("./user.validation");
 const fileUploader_1 = require("../../utils/fileUploader");
@@ -15,6 +16,9 @@ const router = express_1.default.Router();
 router.get('/', (0, auth_1.default)(client_1.UserRoleEnum.ADMIN, client_1.UserRoleEnum.USER), user_controller_1.UserControllers.getAllUsers);
 router.get('/unapproved-users', (0, auth_1.default)(client_1.UserRoleEnum.ADMIN), user_controller_1.UserControllers.getUnapprovedUsers);
 router.get('/me', (0, auth_1.default)(client_1.UserRoleEnum.ADMIN, client_1.UserRoleEnum.USER), user_controller_1.UserControllers.getMyProfile);
+// Username routes — declared BEFORE '/:id' so the literal paths win.
+router.get('/search-users', (0, auth_1.default)('ANY'), username_controller_1.UsernameControllers.searchUsers);
+router.put('/username', (0, auth_1.default)('ANY'), username_controller_1.UsernameControllers.setUsername);
 router.get('/:id', (0, auth_1.default)('ANY'), user_controller_1.UserControllers.getUserDetails);
 router.delete('/soft-delete', (0, auth_1.default)('ANY'), user_controller_1.UserControllers.softDeleteUser);
 router.delete('/hard-delete/:id', (0, auth_1.default)(client_1.UserRoleEnum.ADMIN), user_controller_1.UserControllers.hardDeleteUser);

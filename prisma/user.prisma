@@ -1,6 +1,9 @@
 model User {
   id           String       @id @default(auto()) @map("_id") @db.ObjectId
   fullName     String
+  // Public handle so people can be found (lowercase, 3-20 chars, a-z 0-9 _ .).
+  // Optional for existing accounts; uniqueness enforced in the service layer.
+  username     String?
   businessType String?
   email        String       @unique
   phoneNumber  String?      @unique
