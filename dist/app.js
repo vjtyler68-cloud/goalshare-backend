@@ -75,6 +75,15 @@ app.get('/', (req, res) => {
         Message: 'The server is running. . .',
     });
 });
+// Public legal pages (App Store requires a reachable privacy-policy URL).
+// Served from dist/public so the URL is stable regardless of process cwd.
+const path_1 = require('path');
+app.get(['/privacy', '/privacy.html'], (req, res) => {
+    res.sendFile(path_1.join(__dirname, 'public', 'privacy.html'));
+});
+app.get(['/terms', '/terms.html'], (req, res) => {
+    res.sendFile(path_1.join(__dirname, 'public', 'terms.html'));
+});
 app.use('/api/v1', apiLimiter, routes_1.default);
 app.use(globalErrorHandler_1.default);
 routes_1.default.post('/upload-image', (0, auth_1.default)(), fileUploader_1.upload.single('image'), (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {

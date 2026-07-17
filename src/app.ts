@@ -11,6 +11,7 @@ import { upload } from './app/utils/fileUploader';
 import catchAsync from './app/utils/catchAsync';
 import AppError from './app/errors/AppError';
 import { uploadToDigitalOcean } from './app/utils/uploadToDigitalOceanAWS';
+import path from 'path';
 const app: Application = express();
 
 app.post(
@@ -75,6 +76,15 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
+
+// Public legal pages (App Store requires a reachable privacy-policy URL).
+// Served from dist/public so the URL is stable regardless of process cwd.
+app.get(['/privacy', '/privacy.html'], (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'public', 'privacy.html'));
+});
+app.get(['/terms', '/terms.html'], (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, 'public', 'terms.html'));
+});
 
 app.get('/', (req: Request, res: Response) => {
   res.send({
