@@ -39,7 +39,12 @@ const config_1 = __importDefault(require("../../config"));
 //   } catch (error) {}
 // };
 const sendEmail = (to, html, subject) => __awaiter(void 0, void 0, void 0, function* () {
-    const from = config_1.default.mail_from || config_1.default.mail;
+    // MAIL_FROM may be a bare address ("no-reply@x.com") or already carry a
+    // display name ("GoalShare <no-reply@x.com>") — normalize both shapes.
+    const rawFrom = (config_1.default.mail_from || config_1.default.mail || '').trim();
+    const from = rawFrom.includes('<')
+        ? rawFrom.slice(rawFrom.indexOf('<') + 1, rawFrom.indexOf('>'))
+        : rawFrom;
     // HTTP APIs over HTTPS:443 are the preferred paths — Railway blocks outbound
     // SMTP ports on Trial/Hobby plans (every send died with ETIMEDOUT on CONN),
     // but it cannot block plain HTTPS. Priority: Resend → Brevo → SMTP fallback.

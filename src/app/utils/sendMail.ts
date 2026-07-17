@@ -27,7 +27,13 @@ import config from '../../config';
 // };
 
 export const sendEmail = async (to: string, html: string, subject: string) => {
-  const from = config.mail_from || config.mail;
+  // MAIL_FROM may be a bare address ("no-reply@x.com") or already carry a
+  // display name ("GoalShare <no-reply@x.com>") — normalize both shapes.
+  const rawFrom = (config.mail_from || config.mail || '').trim();
+  const bareFrom = rawFrom.includes('<')
+    ? rawFrom.slice(rawFrom.indexOf('<') + 1, rawFrom.indexOf('>'))
+    : rawFrom;
+  const from = bareFrom;
   // HTTP APIs over HTTPS:443 are the preferred paths — Railway blocks outbound
   // SMTP ports on Trial/Hobby plans (every send died with ETIMEDOUT on CONN),
   // but it cannot block plain HTTPS. Priority: Resend → Brevo → SMTP fallback.
