@@ -10,6 +10,7 @@ import {
   generateOTP,
   getOtpStatusMessage,
   isTestOtpMode,
+  isFreeAccessMode,
   otpExpiryTime,
 } from '../../utils/otp';
 
@@ -203,12 +204,13 @@ const registerWithOtpIntoDB = async (payload: User) => {
     password: hashedPassword,
     otp: otp.toString(),
     otpExpiry: otpExpiryTime(),
-    // Test mode (AUTO_VERIFY_SIGNUPS): auto-grant an active subscription so any
-    // TestFlight tester lands straight in the app without the paywall.
-    // REMOVE (turn the env var off) before public launch so real subscriptions apply.
-    ...(isTestOtpMode()
+    // Test mode (AUTO_VERIFY_SIGNUPS): skip the email round-trip entirely.
+    ...(isTestOtpMode() ? { isEmailVerified: true } : {}),
+    // Free-access period (FREE_ACCESS_SIGNUPS or test mode): grant an active
+    // subscription so testers land past the paywall while IAP isn't live.
+    // REMOVE the env vars at public launch so real subscriptions apply.
+    ...(isFreeAccessMode()
       ? {
-          isEmailVerified: true,
           subscriptionStart: new Date(),
           subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'),
           hasUsedFree: true,
@@ -334,6 +336,15 @@ const verifyEmailWithOtp = async (payload: { email: string; otp: string }) => {
       otp: null,
       otpExpiry: null,
       isEmailVerified: true,
+      // Free-access period: users created before the flag existed may have no
+      // subscription — grant it on verify so they don't hit the paywall.
+      ...(isFreeAccessMode() && !userData.subscriptionEnd
+        ? {
+            subscriptionStart: new Date(),
+            subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'),
+            hasUsedFree: true,
+          }
+        : {}),
     },
     select: {
       id: true,

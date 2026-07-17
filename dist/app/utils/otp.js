@@ -4,12 +4,20 @@ exports.generateOTP = generateOTP;
 exports.otpExpiryTime = otpExpiryTime;
 exports.getOtpStatusMessage = getOtpStatusMessage;
 exports.isTestOtpMode = isTestOtpMode;
+exports.isFreeAccessMode = isFreeAccessMode;
 // TEST MODE: while the email provider isn't live yet, setting the env var
 // AUTO_VERIFY_SIGNUPS=true makes every verification code the static 123456
 // so TestFlight testers can sign up without receiving email.
 // REMOVE THE ENV VAR BEFORE PUBLIC LAUNCH.
 function isTestOtpMode() {
     return process.env.AUTO_VERIFY_SIGNUPS === 'true';
+}
+// FREE ACCESS: FREE_ACCESS_SIGNUPS=true keeps granting every new signup a
+// free subscription (no paywall) even after real email verification is
+// switched on — for the pre-IAP TestFlight period. Test mode implies it.
+// REMOVE BOTH ENV VARS AT PUBLIC LAUNCH.
+function isFreeAccessMode() {
+    return process.env.FREE_ACCESS_SIGNUPS === 'true' || isTestOtpMode();
 }
 function generateOTP() {
     if (isTestOtpMode())

@@ -194,11 +194,13 @@ const registerWithOtpIntoDB = (payload) => __awaiter(void 0, void 0, void 0, fun
     }
     // OTP generate (number) — static 123456 in test mode (AUTO_VERIFY_SIGNUPS).
     const otp = (0, otp_1.isTestOtpMode)() ? 123456 : Math.floor(100000 + Math.random() * 900000);
-    // Test mode (AUTO_VERIFY_SIGNUPS): auto-grant an active subscription so any
-    // TestFlight tester lands straight in without the paywall. REMOVE before launch.
-    const testSub = (0, otp_1.isTestOtpMode)()
-        ? { isEmailVerified: true, subscriptionStart: new Date(), subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'), hasUsedFree: true }
-        : {};
+    // Test mode (AUTO_VERIFY_SIGNUPS): skip the email round-trip entirely.
+    // Free-access period (FREE_ACCESS_SIGNUPS or test mode): grant an active
+    // subscription so testers land past the paywall while IAP isn't live.
+    // REMOVE the env vars at public launch so real subscriptions apply.
+    const testSub = Object.assign(Object.assign({}, ((0, otp_1.isTestOtpMode)() ? { isEmailVerified: true } : {})), ((0, otp_1.isFreeAccessMode)()
+        ? { subscriptionStart: new Date(), subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'), hasUsedFree: true }
+        : {}));
     const userData = Object.assign(Object.assign(Object.assign({}, payload), { password: hashedPassword, otp: otp.toString(), otpExpiry: (0, otp_1.otpExpiryTime)() }), testSub);
     const newUser = yield prisma_1.prisma.user.create({
         data: userData,
@@ -296,11 +298,12 @@ const verifyEmailWithOtp = (payload) => __awaiter(void 0, void 0, void 0, functi
         where: {
             email: userData.email,
         },
-        data: {
-            otp: null,
-            otpExpiry: null,
-            isEmailVerified: true,
-        },
+        data: Object.assign({ otp: null, otpExpiry: null, isEmailVerified: true },
+        // Free-access period: users created before the flag existed may have no
+        // subscription — grant it on verify so they don't hit the paywall.
+        ((0, otp_1.isFreeAccessMode)() && !userData.subscriptionEnd
+            ? { subscriptionStart: new Date(), subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'), hasUsedFree: true }
+            : {})),
         select: {
             id: true,
         },

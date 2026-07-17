@@ -6,6 +6,14 @@ export function isTestOtpMode(): boolean {
     return process.env.AUTO_VERIFY_SIGNUPS === 'true';
 }
 
+/// FREE ACCESS: FREE_ACCESS_SIGNUPS=true keeps granting every new signup a
+/// free subscription (no paywall) even after real email verification is
+/// switched on — for the pre-IAP TestFlight period. Test mode implies it.
+/// REMOVE BOTH ENV VARS AT PUBLIC LAUNCH.
+export function isFreeAccessMode(): boolean {
+    return process.env.FREE_ACCESS_SIGNUPS === 'true' || isTestOtpMode();
+}
+
 export function generateOTP(): string {
     if (isTestOtpMode()) return '123456';
     const otp = Math.floor(Math.random() * 1000000);
