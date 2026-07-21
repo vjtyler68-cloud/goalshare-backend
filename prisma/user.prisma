@@ -49,6 +49,9 @@ model User {
   budget    Budget[]
   leads     Lead[]
 
+  sentFriendRequests     FriendRequest[] @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[] @relation("ReceivedFriendRequests")
+
   // communityMessage           CommunityMessage[]
   // communityMessageReadStatus CommunityMessageReadStatus[]
   room                Room[]                @relation("RoomSender")
