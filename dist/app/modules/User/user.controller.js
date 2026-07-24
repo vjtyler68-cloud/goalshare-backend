@@ -133,7 +133,22 @@ const updateUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
         data: result,
     });
 }));
+// PUT /user/fcm-token { token, platform } — register this device for push.
+const setFcmToken = (0, catchAsync_1.default)(async (req, res) => {
+    const id = req.user.id;
+    const token = ((req.body && req.body.token) || '').toString();
+    if (token) {
+        await user_service_1.UserServices.updateFcmToken(id, token);
+    }
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Token registered',
+        data: null,
+    });
+});
 exports.UserControllers = {
+    setFcmToken,
     getAllUsers,
     getMyProfile,
     getUserDetails,

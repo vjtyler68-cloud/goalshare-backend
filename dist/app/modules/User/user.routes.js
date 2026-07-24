@@ -19,6 +19,8 @@ router.get('/me', (0, auth_1.default)(client_1.UserRoleEnum.ADMIN, client_1.User
 // Username routes — declared BEFORE '/:id' so the literal paths win.
 router.get('/search-users', (0, auth_1.default)('ANY'), username_controller_1.UsernameControllers.searchUsers);
 router.put('/username', (0, auth_1.default)('ANY'), username_controller_1.UsernameControllers.setUsername);
+// Push notifications: register/refresh this device's FCM token.
+router.put('/fcm-token', (0, auth_1.default)('ANY'), user_controller_1.UserControllers.setFcmToken);
 router.get('/:id', (0, auth_1.default)('ANY'), user_controller_1.UserControllers.getUserDetails);
 router.delete('/soft-delete', (0, auth_1.default)('ANY'), user_controller_1.UserControllers.softDeleteUser);
 router.delete('/hard-delete/:id', (0, auth_1.default)(client_1.UserRoleEnum.ADMIN), user_controller_1.UserControllers.hardDeleteUser);

@@ -29,6 +29,9 @@ router.get(
 router.get('/search-users', auth('ANY'), UsernameControllers.searchUsers);
 router.put('/username', auth('ANY'), UsernameControllers.setUsername);
 
+// Push notifications: register/refresh this device's FCM token.
+router.put('/fcm-token', auth('ANY'), UserControllers.setFcmToken);
+
 router.get('/:id', auth('ANY'), UserControllers.getUserDetails);
 
 router.delete('/soft-delete', auth('ANY'), UserControllers.softDeleteUser);

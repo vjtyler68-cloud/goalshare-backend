@@ -19,6 +19,7 @@ const payment_route_1 = require("../modules/Payment/payment.route");
 const Global_routes_1 = require("../modules/Global/Global.routes");
 const Leads_routes_1 = require("../modules/Leads/Leads.routes");
 const Friends_routes_1 = require("../modules/Friends/Friends.routes");
+const Push_routes_1 = require("../modules/Push/Push.routes");
 const Data_routes_1 = require("../modules/Data/Data.routes");
 const router = express_1.default.Router();
 const moduleRoutes = [
@@ -81,6 +82,10 @@ const moduleRoutes = [
     {
         path: '/friends',
         route: Friends_routes_1.FriendsRoutes,
+    },
+    {
+        path: '/push',
+        route: Push_routes_1.PushRoutes,
     },
     {
         path: '/data',

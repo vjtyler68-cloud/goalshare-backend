@@ -16,6 +16,7 @@ exports.FriendsServices = void 0;
 const client_1 = require("@prisma/client");
 const http_status_1 = __importDefault(require("http-status"));
 const AppError_1 = __importDefault(require("../../errors/AppError"));
+const fcm_1 = require("../../utils/fcm");
 const prisma = new client_1.PrismaClient();
 
 /** Public shape of the person on the other end of a request/friendship. */
@@ -58,6 +59,7 @@ const sendRequest = (myId, toUserId) => __awaiter(void 0, void 0, void 0, functi
         const created = yield prisma.friendRequest.create({
             data: { fromId: myId, toId: toUserId },
         });
+        (0, fcm_1.pushFriendRequest)(myId, toUserId); // fire-and-forget
         return { request: created, becameFriends: false };
     }
     if (existing.status === 'accepted') {
@@ -72,6 +74,7 @@ const sendRequest = (myId, toUserId) => __awaiter(void 0, void 0, void 0, functi
             where: { id: existing.id },
             data: { status: 'accepted' },
         });
+        (0, fcm_1.pushFriendAccepted)(myId, toUserId); // fire-and-forget
         return { request: accepted, becameFriends: true };
     }
     // declined earlier — allow a fresh ask, re-pointed at the new sender.
@@ -113,10 +116,12 @@ const acceptRequest = (myId, requestId) => __awaiter(void 0, void 0, void 0, fun
     });
     if (!req)
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Request not found');
-    return prisma.friendRequest.update({
+    const updated = yield prisma.friendRequest.update({
         where: { id: req.id },
         data: { status: 'accepted' },
     });
+    (0, fcm_1.pushFriendAccepted)(myId, req.fromId); // notify the original sender
+    return updated;
 });
 
 /** Recipient declines a pending request. */

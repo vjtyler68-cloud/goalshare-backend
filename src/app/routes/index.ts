@@ -15,6 +15,7 @@ import { GlobalRoutes } from '../modules/Global/Global.routes';
 import { LeadsRoutes } from '../modules/Leads/Leads.routes';
 import { DataRoutes } from '../modules/Data/Data.routes';
 import { FriendsRoutes } from '../modules/Friends/Friends.routes';
+import { PushRoutes } from '../modules/Push/Push.routes';
 
 const router = express.Router();
 
@@ -78,6 +79,10 @@ const moduleRoutes = [
   {
     path: '/friends',
     route: FriendsRoutes,
+  },
+  {
+    path: '/push',
+    route: PushRoutes,
   },
   {
     path: '/data',

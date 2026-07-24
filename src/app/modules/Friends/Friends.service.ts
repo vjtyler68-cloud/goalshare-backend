@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import httpStatus from 'http-status';
 import AppError from '../../errors/AppError';
+import { pushFriendRequest, pushFriendAccepted } from '../../utils/fcm';
 
 const prisma = new PrismaClient();
 
@@ -45,6 +46,7 @@ const sendRequest = async (myId: string, toUserId: string) => {
     const created = await prisma.friendRequest.create({
       data: { fromId: myId, toId: toUserId },
     });
+    pushFriendRequest(myId, toUserId); // fire-and-forget
     return { request: created, becameFriends: false };
   }
 
@@ -60,6 +62,7 @@ const sendRequest = async (myId: string, toUserId: string) => {
       where: { id: existing.id },
       data: { status: 'accepted' },
     });
+    pushFriendAccepted(myId, toUserId); // fire-and-forget
     return { request: accepted, becameFriends: true };
   }
   // declined earlier — allow a fresh ask, re-pointed at the new sender.
@@ -100,10 +103,12 @@ const acceptRequest = async (myId: string, requestId: string) => {
     where: { id: requestId, toId: myId, status: 'pending' },
   });
   if (!req) throw new AppError(httpStatus.NOT_FOUND, 'Request not found');
-  return prisma.friendRequest.update({
+  const updated = await prisma.friendRequest.update({
     where: { id: req.id },
     data: { status: 'accepted' },
   });
+  pushFriendAccepted(myId, req.fromId); // notify the original sender
+  return updated;
 };
 
 /** Recipient declines a pending request. */
