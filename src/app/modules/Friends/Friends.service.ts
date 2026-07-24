@@ -70,6 +70,7 @@ const sendRequest = async (myId: string, toUserId: string) => {
     where: { id: existing.id },
     data: { fromId: myId, toId: toUserId, status: 'pending' },
   });
+  pushFriendRequest(myId, toUserId); // fire-and-forget
   return { request: revived, becameFriends: false };
 };
 

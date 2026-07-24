@@ -82,6 +82,7 @@ const sendRequest = (myId, toUserId) => __awaiter(void 0, void 0, void 0, functi
         where: { id: existing.id },
         data: { fromId: myId, toId: toUserId, status: 'pending' },
     });
+    (0, fcm_1.pushFriendRequest)(myId, toUserId); // fire-and-forget
     return { request: revived, becameFriends: false };
 });
 
