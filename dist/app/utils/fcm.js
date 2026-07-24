@@ -1,9 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.isPushReady = isPushReady;
 exports.sendPushToUser = sendPushToUser;
 exports.pushFriendRequest = pushFriendRequest;
 exports.pushFriendAccepted = pushFriendAccepted;
 const prisma_1 = require("./prisma");
+// Diagnostic: true once firebase-admin initialized with a valid service account.
+function isPushReady() {
+    return getMessaging() != null;
+}
 // Push notifications via Firebase Cloud Messaging (firebase-admin).
 // firebase-admin is require()d LAZILY (inside getMessaging, not at module load)
 // so a missing package / missing env var can NEVER crash the server at boot.

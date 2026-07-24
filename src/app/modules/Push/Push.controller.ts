@@ -1,7 +1,7 @@
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import httpStatus from 'http-status';
-import { sendPushToUser } from '../../utils/fcm';
+import { sendPushToUser, isPushReady } from '../../utils/fcm';
 
 /**
  * POST /push/notify  { toUserId, title, body }
@@ -31,4 +31,16 @@ const notify = catchAsync(async (req, res) => {
   });
 });
 
-export const PushControllers = { notify };
+// GET /push/health — reports whether firebase-admin is configured (key valid).
+// Sends nothing; safe to hit. Returns { ok: true } once the service account is
+// loaded, { ok: false } if FIREBASE_SERVICE_ACCOUNT is missing/malformed.
+const health = catchAsync(async (req, res) => {
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'push health',
+    data: { ok: isPushReady() },
+  });
+});
+
+export const PushControllers = { notify, health };

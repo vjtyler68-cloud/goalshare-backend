@@ -62,6 +62,15 @@ function getMessaging(): any {
 }
 
 /**
+ * Diagnostic: true once firebase-admin has initialized with a valid service
+ * account (i.e. the FIREBASE_SERVICE_ACCOUNT env var is present and parseable).
+ * Used by GET /push/health to confirm the key without sending anything.
+ */
+export function isPushReady(): boolean {
+  return getMessaging() != null;
+}
+
+/**
  * Send a push to a single user by their stored fcmToken. Never throws. If FCM
  * says the token is dead, clear it so we stop trying.
  */
