@@ -1,123 +1,130 @@
 "use strict";
+/* Compiled replacement for dist/app/utils/fcm.js — FCM HTTP v1 direct send.
+ * Must be committed alongside src/app/utils/fcm.ts because Railway runs the
+ * committed dist/ (no build step). Keep both in sync. */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isPushReady = isPushReady;
 exports.sendPushToUser = sendPushToUser;
-exports.pushFriendRequest = pushFriendRequest;
-exports.pushFriendAccepted = pushFriendAccepted;
 const prisma_1 = require("./prisma");
-// Diagnostic: true once firebase-admin initialized with a valid service account.
-function isPushReady() {
-    return getMessaging() != null;
-}
-// Push notifications via Firebase Cloud Messaging (firebase-admin).
-// firebase-admin is require()d LAZILY (inside getMessaging, not at module load)
-// so a missing package / missing env var can NEVER crash the server at boot.
-// Every send is wrapped — a push failure must not break the flow that fired it.
-let messaging = null;
-let initTried = false;
-let initFailed = false;
-function getMessaging() {
-    if (messaging)
-        return messaging;
-    if (initTried)
-        return initFailed ? null : messaging;
-    initTried = true;
+const crypto = require("crypto");
+
+let sa = null;
+let saTried = false;
+function getServiceAccount() {
+    if (sa) return sa;
+    if (saTried) return sa;
+    saTried = true;
     try {
-        // Lazy require so a missing package can NEVER crash server boot.
-        const admin = require('firebase-admin');
         const raw = process.env.FIREBASE_SERVICE_ACCOUNT ||
             (process.env.FIREBASE_SERVICE_ACCOUNT_B64
                 ? Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8')
                 : '');
         if (!raw) {
-            initFailed = true;
             console.warn('[push] FIREBASE_SERVICE_ACCOUNT not set — push disabled');
             return null;
         }
-        const serviceAccount = JSON.parse(raw);
-        if (!admin.apps || admin.apps.length === 0) {
-            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+        const parsed = JSON.parse(raw);
+        if (!parsed.project_id || !parsed.client_email || !parsed.private_key) {
+            console.warn('[push] FIREBASE_SERVICE_ACCOUNT missing fields — push disabled');
+            return null;
         }
-        messaging = admin.messaging();
-        return messaging;
+        sa = parsed;
+        return sa;
     }
     catch (err) {
-        initFailed = true;
-        console.warn('[push] init failed — push disabled:', (err && err.message) || err);
+        console.warn('[push] service account parse failed — push disabled:', (err && err.message) || err);
+        return null;
+    }
+}
+function isPushReady() {
+    return getServiceAccount() != null;
+}
+let cachedToken = null;
+let cachedTokenExp = 0;
+async function getAccessToken() {
+    const acct = getServiceAccount();
+    if (!acct) return null;
+    const now = Math.floor(Date.now() / 1000);
+    if (cachedToken && now < cachedTokenExp - 60) return cachedToken;
+    try {
+        const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+        const unsigned = b64u({ alg: 'RS256', typ: 'JWT' }) + '.' + b64u({
+            iss: acct.client_email,
+            scope: 'https://www.googleapis.com/auth/firebase.messaging',
+            aud: 'https://oauth2.googleapis.com/token',
+            iat: now,
+            exp: now + 3600,
+        });
+        const sig = crypto.sign('RSA-SHA256', Buffer.from(unsigned), acct.private_key).toString('base64url');
+        const res = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') +
+                '&assertion=' + encodeURIComponent(unsigned + '.' + sig),
+        });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.access_token) {
+            console.warn('[push] oauth token fetch failed:', res.status, JSON.stringify(j) ? JSON.stringify(j).slice(0, 300) : '');
+            return null;
+        }
+        cachedToken = j.access_token;
+        cachedTokenExp = now + (Number(j.expires_in) || 3600);
+        return cachedToken;
+    }
+    catch (err) {
+        console.warn('[push] oauth token fetch error:', (err && err.message) || err);
         return null;
     }
 }
 async function sendPushToUser(userId, title, body, data = {}) {
     try {
-        if (!userId)
-            return;
-        const m = getMessaging();
-        if (!m)
-            return; // push not configured — no-op
+        if (!userId) return;
+        const acct = getServiceAccount();
+        if (!acct) return;
         const user = await prisma_1.prisma.user.findUnique({
             where: { id: userId },
             select: { fcmToken: true },
         });
         const token = user && user.fcmToken;
-        if (!token)
-            return;
-        await m.send({
-            token,
-            notification: { title, body },
-            data: data || {},
-            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
-            android: {
-                priority: 'high',
-                notification: { channelId: 'messages', sound: 'default' },
+        if (!token) return;
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
+        const res = await fetch(`https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
             },
+            body: JSON.stringify({
+                message: {
+                    token,
+                    notification: { title, body },
+                    data: data || {},
+                    apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+                    android: {
+                        priority: 'HIGH',
+                        notification: { channel_id: 'messages', sound: 'default' },
+                    },
+                },
+            }),
         });
+        if (!res.ok) {
+            const j = await res.json().catch(() => null);
+            const det = j && j.error && j.error.details;
+            const errCode = (det && det.find((d) => d && d.errorCode) && det.find((d) => d && d.errorCode).errorCode) ||
+                (j && j.error && j.error.status) || '';
+            if (errCode === 'UNREGISTERED' || errCode === 'INVALID_ARGUMENT' || res.status === 404) {
+                try {
+                    await prisma_1.prisma.user.update({ where: { id: userId }, data: { fcmToken: null } });
+                }
+                catch (_a) { /* ignore */ }
+            }
+            else {
+                console.warn('[push] send failed:', res.status, JSON.stringify(j) ? JSON.stringify(j).slice(0, 300) : '');
+            }
+        }
     }
     catch (err) {
-        const code = (err && err.errorInfo && err.errorInfo.code) || (err && err.code) || '';
-        if (code === 'messaging/registration-token-not-registered' ||
-            code === 'messaging/invalid-registration-token' ||
-            code === 'messaging/invalid-argument') {
-            try {
-                await prisma_1.prisma.user.update({
-                    where: { id: userId },
-                    data: { fcmToken: null },
-                });
-            }
-            catch (e) {
-                /* ignore */
-            }
-        }
-        else {
-            console.warn('[push] send failed:', (err && err.message) || err);
-        }
-    }
-}
-async function pushFriendRequest(fromId, toId) {
-    try {
-        const from = await prisma_1.prisma.user.findUnique({
-            where: { id: fromId },
-            select: { fullName: true },
-        });
-        const name = (from && from.fullName) || 'Someone';
-        await sendPushToUser(toId, 'New friend request', name + ' wants to be friends', {
-            type: 'friend_request',
-            fromUserId: fromId,
-        });
-    }
-    catch (e) {
-        /* ignore */
-    }
-}
-async function pushFriendAccepted(fromId, toId) {
-    try {
-        const from = await prisma_1.prisma.user.findUnique({
-            where: { id: fromId },
-            select: { fullName: true },
-        });
-        const name = (from && from.fullName) || 'Someone';
-        await sendPushToUser(toId, 'Friend request accepted', name + ' accepted your friend request', { type: 'friend_accept', fromUserId: fromId });
-    }
-    catch (e) {
-        /* ignore */
+        console.warn('[push] send failed:', (err && err.message) || err);
     }
 }
