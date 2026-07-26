@@ -110,6 +110,15 @@ async function sendPushToUser(userId, title, body, data = {}) {
         });
         if (!res.ok) {
             const j = await res.json().catch(() => null);
+            // TEMP DIAG: what does Google think of this token?
+            try {
+                console.warn('[push][diag] www-authenticate:', res.headers.get('www-authenticate'));
+                const ti = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(accessToken));
+                const tij = await ti.json().catch(() => null);
+                console.warn('[push][diag] tokeninfo:', ti.status, JSON.stringify(tij));
+                console.warn('[push][diag] tokenLen:', accessToken.length, 'proj:', acct.project_id, 'email:', acct.client_email);
+            }
+            catch (e) { console.warn('[push][diag] probe failed:', (e && e.message) || e); }
             const det = j && j.error && j.error.details;
             const errCode = (det && det.find((d) => d && d.errorCode) && det.find((d) => d && d.errorCode).errorCode) ||
                 (j && j.error && j.error.status) || '';
@@ -120,7 +129,7 @@ async function sendPushToUser(userId, title, body, data = {}) {
                 catch (_a) { /* ignore */ }
             }
             else {
-                console.warn('[push] send failed:', res.status, JSON.stringify(j) ? JSON.stringify(j).slice(0, 300) : '');
+                console.warn('[push] send failed:', res.status, JSON.stringify(j));
             }
         }
     }
