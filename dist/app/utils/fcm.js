@@ -135,6 +135,13 @@ async function sendPushToUser(userId, title, body, data = {}) {
             });
         if (res.status < 200 || res.status >= 300) {
             const j = res.json;
+            // TEMP DIAG: does the Authorization header actually leave this host?
+            try {
+                const echo = await httpsPostJson('https://httpbin.org/post', { Authorization: `Bearer ${accessToken}` }, { ping: 1 });
+                const hdrs = (echo.json && echo.json.headers) || {};
+                const authSeen = hdrs.Authorization || hdrs.authorization || '';
+                console.warn('[push][diag] echo: authHeaderPresent=', !!authSeen, 'len=', authSeen.length, 'tokenLen=', accessToken.length);
+            } catch (e) { console.warn('[push][diag] echo failed:', (e && e.message) || e); }
             const det = j && j.error && j.error.details;
             const errCode = (det && det.find((d) => d && d.errorCode) && det.find((d) => d && d.errorCode).errorCode) ||
                 (j && j.error && j.error.status) || '';
