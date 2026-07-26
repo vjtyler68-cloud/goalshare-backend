@@ -27,7 +27,12 @@ function httpsPostJson(urlStr, headers, bodyObj) {
             res.on('end', () => {
                 let json = null;
                 try { json = JSON.parse(data); } catch (_) { }
-                resolve({ status: res.statusCode || 0, json });
+                resolve({
+                    status: res.statusCode || 0,
+                    json,
+                    remoteIp: (res.socket && res.socket.remoteAddress) || null,
+                    hdr: { server: res.headers['server'], via: res.headers['via'], 'www-authenticate': res.headers['www-authenticate'], 'x-served-by': res.headers['x-served-by'] },
+                });
             });
         });
         req.on('error', reject);
@@ -118,30 +123,32 @@ async function sendPushToUser(userId, title, body, data = {}) {
         if (!token) return;
         const accessToken = await getAccessToken();
         if (!accessToken) return;
-        const res = await httpsPostJson(
-            `https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`,
-            { Authorization: `Bearer ${accessToken}` },
-            {
-                message: {
-                    token,
-                    notification: { title, body },
-                    data: data || {},
-                    apns: { payload: { aps: { sound: 'default', badge: 1 } } },
-                    android: {
-                        priority: 'HIGH',
-                        notification: { channel_id: 'messages', sound: 'default' },
-                    },
+        const msg = {
+            message: {
+                token,
+                notification: { title, body },
+                data: data || {},
+                apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+                android: {
+                    priority: 'HIGH',
+                    notification: { channel_id: 'messages', sound: 'default' },
                 },
-            });
+            },
+        };
+        let res = await httpsPostJson(
+            `https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`,
+            { Authorization: `Bearer ${accessToken}` }, msg);
+        if (res.status === 401) {
+            // TEMP DIAG: who actually answered us?
+            console.warn('[push][diag] fcm 401 from ip=', res.remoteIp, 'hdr=', JSON.stringify(res.hdr));
+            // Retry via Google's alternate front door for the same API.
+            res = await httpsPostJson(
+                `https://content-fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`,
+                { Authorization: `Bearer ${accessToken}` }, msg);
+            console.warn('[push][diag] content-fcm retry status=', res.status, 'ip=', res.remoteIp);
+        }
         if (res.status < 200 || res.status >= 300) {
             const j = res.json;
-            // TEMP DIAG: does the Authorization header actually leave this host?
-            try {
-                const echo = await httpsPostJson('https://httpbin.org/post', { Authorization: `Bearer ${accessToken}` }, { ping: 1 });
-                const hdrs = (echo.json && echo.json.headers) || {};
-                const authSeen = hdrs.Authorization || hdrs.authorization || '';
-                console.warn('[push][diag] echo: authHeaderPresent=', !!authSeen, 'len=', authSeen.length, 'tokenLen=', accessToken.length);
-            } catch (e) { console.warn('[push][diag] echo failed:', (e && e.message) || e); }
             const det = j && j.error && j.error.details;
             const errCode = (det && det.find((d) => d && d.errorCode) && det.find((d) => d && d.errorCode).errorCode) ||
                 (j && j.error && j.error.status) || '';
