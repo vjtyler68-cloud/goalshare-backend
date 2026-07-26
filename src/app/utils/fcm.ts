@@ -3,76 +3,114 @@
 import { prisma } from './prisma';
 
 /**
- * Push notifications via Firebase Cloud Messaging (firebase-admin).
+ * Push notifications via FCM HTTP v1 — DIRECT, no firebase-admin for sending.
  *
- * Design goals, in priority order:
- *  1. NEVER crash the server. firebase-admin is `require`d lazily (inside the
- *     init function, not at module load) so a missing package or a missing
- *     service-account env var can't take the process down at boot.
- *  2. NEVER throw to callers. Every send is wrapped — a push failure must not
- *     break the friend-request / accept / message flow that triggered it.
- *  3. Self-heal token rot: when FCM reports a token as permanently invalid,
- *     clear it on the user so we stop retrying.
+ * WHY: firebase-admin's send() was hitting FCM with NO Authorization header on
+ * this deployment ("Request is missing required authentication credential"),
+ * on both Node 18 and Node 22, even though the service-account key is valid
+ * (verified independently: manual JWT -> oauth2.googleapis.com -> FCM v1 send
+ * succeeds with the same key). So we do exactly that proven flow ourselves
+ * with node:crypto + fetch. Zero new dependencies.
  *
- * Setup (one-time, done by VJ):
- *  - Firebase Console -> goalshare-966d1 -> Project settings -> Service accounts
- *    -> Generate new private key. Put the JSON in the Railway env var
- *    FIREBASE_SERVICE_ACCOUNT (or base64 in FIREBASE_SERVICE_ACCOUNT_B64).
- *  - The APNs .p8 key is already uploaded to Firebase, so iOS delivery works
- *    with no extra config here.
- * FCM sending is free on the Firebase Spark plan — no Blaze required.
+ * firebase-admin can stay installed for Firestore use elsewhere; this module
+ * no longer touches it.
+ *
+ * Same design rules as before:
+ *  1. NEVER crash the server.
+ *  2. NEVER throw to callers.
+ *  3. Self-heal token rot (clear dead device tokens).
  */
 
-let messaging: any = null;
-let initTried = false;
-let initFailed = false;
+const crypto = require('crypto');
 
-function getMessaging(): any {
-  if (messaging) return messaging;
-  if (initTried) return initFailed ? null : messaging;
-  initTried = true;
+type ServiceAccount = {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+};
+
+let sa: ServiceAccount | null = null;
+let saTried = false;
+
+function getServiceAccount(): ServiceAccount | null {
+  if (sa) return sa;
+  if (saTried) return sa;
+  saTried = true;
   try {
-    // Lazy require so a missing package can NEVER crash server boot.
-    const admin = require('firebase-admin');
-
     const raw =
       process.env.FIREBASE_SERVICE_ACCOUNT ||
       (process.env.FIREBASE_SERVICE_ACCOUNT_B64
-        ? Buffer.from(
-            process.env.FIREBASE_SERVICE_ACCOUNT_B64,
-            'base64',
-          ).toString('utf8')
+        ? Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8')
         : '');
     if (!raw) {
-      initFailed = true;
       console.warn('[push] FIREBASE_SERVICE_ACCOUNT not set — push disabled');
       return null;
     }
-    const serviceAccount = JSON.parse(raw);
-    if (!admin.apps || admin.apps.length === 0) {
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    const parsed = JSON.parse(raw);
+    if (!parsed.project_id || !parsed.client_email || !parsed.private_key) {
+      console.warn('[push] FIREBASE_SERVICE_ACCOUNT missing fields — push disabled');
+      return null;
     }
-    messaging = admin.messaging();
-    return messaging;
+    sa = parsed;
+    return sa;
   } catch (err: any) {
-    initFailed = true;
-    console.warn('[push] init failed — push disabled:', err?.message || err);
+    console.warn('[push] service account parse failed — push disabled:', err?.message || err);
+    return null;
+  }
+}
+
+export function isPushReady(): boolean {
+  return getServiceAccount() != null;
+}
+
+// ---- OAuth token (cached ~50 min; Google issues 60-min tokens) ----
+let cachedToken: string | null = null;
+let cachedTokenExp = 0;
+
+async function getAccessToken(): Promise<string | null> {
+  const acct = getServiceAccount();
+  if (!acct) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedToken && now < cachedTokenExp - 60) return cachedToken;
+  try {
+    const b64u = (o: any) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const unsigned =
+      b64u({ alg: 'RS256', typ: 'JWT' }) +
+      '.' +
+      b64u({
+        iss: acct.client_email,
+        scope: 'https://www.googleapis.com/auth/firebase.messaging',
+        aud: 'https://oauth2.googleapis.com/token',
+        iat: now,
+        exp: now + 3600,
+      });
+    const sig = crypto.sign('RSA-SHA256', Buffer.from(unsigned), acct.private_key).toString('base64url');
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:
+        'grant_type=' +
+        encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') +
+        '&assertion=' +
+        encodeURIComponent(unsigned + '.' + sig),
+    });
+    const j: any = await res.json().catch(() => null);
+    if (!res.ok || !j?.access_token) {
+      console.warn('[push] oauth token fetch failed:', res.status, JSON.stringify(j)?.slice(0, 300));
+      return null;
+    }
+    cachedToken = j.access_token;
+    cachedTokenExp = now + (Number(j.expires_in) || 3600);
+    return cachedToken;
+  } catch (err: any) {
+    console.warn('[push] oauth token fetch error:', err?.message || err);
     return null;
   }
 }
 
 /**
- * Diagnostic: true once firebase-admin has initialized with a valid service
- * account (i.e. the FIREBASE_SERVICE_ACCOUNT env var is present and parseable).
- * Used by GET /push/health to confirm the key without sending anything.
- */
-export function isPushReady(): boolean {
-  return getMessaging() != null;
-}
-
-/**
- * Send a push to a single user by their stored fcmToken. Never throws. If FCM
- * says the token is dead, clear it so we stop trying.
+ * Send a push to a single user by their stored fcmToken. Never throws.
+ * If FCM says the token is dead, clear it so we stop trying.
  */
 export async function sendPushToUser(
   userId: string,
@@ -82,8 +120,8 @@ export async function sendPushToUser(
 ): Promise<void> {
   try {
     if (!userId) return;
-    const m = getMessaging();
-    if (!m) return; // push not configured — no-op
+    const acct = getServiceAccount();
+    if (!acct) return; // push not configured — no-op
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -92,78 +130,48 @@ export async function sendPushToUser(
     const token = user?.fcmToken;
     if (!token) return;
 
-    await m.send({
-      token,
-      notification: { title, body },
-      data: data || {},
-      apns: { payload: { aps: { sound: 'default', badge: 1 } } },
-      android: {
-        priority: 'high',
-        notification: { channelId: 'messages', sound: 'default' },
+    const accessToken = await getAccessToken();
+    if (!accessToken) return;
+
+    const res = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: {
+            token,
+            notification: { title, body },
+            data: data || {},
+            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+            android: {
+              priority: 'HIGH',
+              notification: { channel_id: 'messages', sound: 'default' },
+            },
+          },
+        }),
       },
-    });
-  } catch (err: any) {
-    const code = err?.errorInfo?.code || err?.code || '';
-    if (
-      code === 'messaging/registration-token-not-registered' ||
-      code === 'messaging/invalid-registration-token' ||
-      code === 'messaging/invalid-argument'
-    ) {
-      try {
-        await prisma.user.update({
-          where: { id: userId },
-          data: { fcmToken: null },
-        });
-      } catch {
-        /* ignore */
-      }
-    } else {
-      console.warn('[push] send failed:', err?.message || err);
-    }
-  }
-}
-
-/** Notify [toId] that [fromId] sent them a friend request. Fire-and-forget. */
-export async function pushFriendRequest(
-  fromId: string,
-  toId: string,
-): Promise<void> {
-  try {
-    const from = await prisma.user.findUnique({
-      where: { id: fromId },
-      select: { fullName: true },
-    });
-    const name = from?.fullName || 'Someone';
-    await sendPushToUser(toId, 'New friend request', `${name} wants to be friends`, {
-      type: 'friend_request',
-      fromUserId: fromId,
-    });
-  } catch {
-    /* ignore */
-  }
-}
-
-/**
- * Notify [toId] that [fromId] accepted their friend request (also used for the
- * mutual-ask auto-accept). Fire-and-forget.
- */
-export async function pushFriendAccepted(
-  fromId: string,
-  toId: string,
-): Promise<void> {
-  try {
-    const from = await prisma.user.findUnique({
-      where: { id: fromId },
-      select: { fullName: true },
-    });
-    const name = from?.fullName || 'Someone';
-    await sendPushToUser(
-      toId,
-      'Friend request accepted',
-      `${name} accepted your friend request`,
-      { type: 'friend_accept', fromUserId: fromId },
     );
-  } catch {
-    /* ignore */
+
+    if (!res.ok) {
+      const j: any = await res.json().catch(() => null);
+      const errCode =
+        j?.error?.details?.find((d: any) => d?.errorCode)?.errorCode || j?.error?.status || '';
+      if (errCode === 'UNREGISTERED' || errCode === 'INVALID_ARGUMENT' || res.status === 404) {
+        // Dead/invalid device token — clear it so we stop retrying.
+        try {
+          await prisma.user.update({ where: { id: userId }, data: { fcmToken: null } });
+        } catch {
+          /* ignore */
+        }
+      } else {
+        console.warn('[push] send failed:', res.status, JSON.stringify(j)?.slice(0, 300));
+      }
+    }
+  } catch (err: any) {
+    console.warn('[push] send failed:', err?.message || err);
   }
 }
