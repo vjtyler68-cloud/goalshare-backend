@@ -135,17 +135,18 @@ async function sendPushToUser(userId, title, body, data = {}) {
                 },
             },
         };
+        // Auth via query param instead of Authorization header: header-based auth
+        // from this host is rejected by Google's edge as "missing credential"
+        // (verified: header provably sent, token provably valid via tokeninfo —
+        // which itself succeeded from here using query-param auth).
         let res = await httpsPostJson(
-            `https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`,
-            { Authorization: `Bearer ${accessToken}` }, msg);
+            `https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send?access_token=${encodeURIComponent(accessToken)}`,
+            {}, msg);
         if (res.status === 401) {
-            // TEMP DIAG: who actually answered us?
-            console.warn('[push][diag] fcm 401 from ip=', res.remoteIp, 'hdr=', JSON.stringify(res.hdr));
-            // Retry via Google's alternate front door for the same API.
+            console.warn('[push][diag] query-param auth also 401; hdr=', JSON.stringify(res.hdr), 'details=', JSON.stringify(res.json && res.json.error && res.json.error.details));
             res = await httpsPostJson(
-                `https://content-fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`,
+                `https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`,
                 { Authorization: `Bearer ${accessToken}` }, msg);
-            console.warn('[push][diag] content-fcm retry status=', res.status, 'ip=', res.remoteIp);
         }
         if (res.status < 200 || res.status >= 300) {
             const j = res.json;
