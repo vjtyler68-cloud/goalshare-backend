@@ -88,6 +88,13 @@ const debug = (0, catchAsync_1.default)(async (req, res) => {
             };
         }
     }
+    let lastFcmHit = null;
+    try {
+        lastFcmHit = await require("../../utils/pushDebug").getFcmHit(user.id);
+    }
+    catch (e) {
+        lastFcmHit = null;
+    }
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
@@ -99,14 +106,7 @@ const debug = (0, catchAsync_1.default)(async (req, res) => {
             platform: user.platform || null,
             tokenTail: token ? token.slice(-8) : null,
             pushReady: (0, fcm_1.isPushReady)(),
-            lastFcmHit: (() => {
-                try {
-                    return require("../../utils/pushDebug").getFcmHit(user.id);
-                }
-                catch (e) {
-                    return null;
-                }
-            })(),
+            lastFcmHit,
             sendResult,
         },
     });
