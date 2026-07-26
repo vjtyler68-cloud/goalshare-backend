@@ -137,6 +137,17 @@ const updateUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
 const setFcmToken = (0, catchAsync_1.default)(async (req, res) => {
     const id = req.user.id;
     const token = ((req.body && req.body.token) || '').toString();
+    // TEMPORARY: record that this device reached the endpoint (and with what),
+    // so /push/debug can show whether registration is even happening.
+    try {
+        require("../../utils/pushDebug").recordFcmHit(id, {
+            tokenLen: token.length,
+            tokenTail: token ? token.slice(-8) : null,
+            platform: ((req.body && req.body.platform) || '').toString(),
+            diag: ((req.body && req.body.diag) || '').toString(),
+        });
+    }
+    catch (e) { /* ignore */ }
     if (token) {
         await user_service_1.UserServices.updateFcmToken(id, token);
     }
