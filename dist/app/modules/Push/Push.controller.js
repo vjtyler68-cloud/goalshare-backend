@@ -95,6 +95,30 @@ const debug = (0, catchAsync_1.default)(async (req, res) => {
     catch (e) {
         lastFcmHit = null;
     }
+    // TEMP: does this user's DEVICE talk to Firebase at all? If the cloud-backup
+    // doc exists, the phone's Firebase is initializing (isReady=true) and the push
+    // failure is later; if it's missing while OTHER users have backups, Firebase
+    // isn't starting on this device — which would explain no token + no diag note.
+    let fbBackup = null;
+    try {
+        (0, fcm_1.isPushReady)(); // force firebase-admin init
+        const admin = require('firebase-admin');
+        if (admin.apps && admin.apps.length) {
+            const db = admin.firestore();
+            const snap = await db.collection('user_backups').doc(String(user.id)).get();
+            fbBackup = { mine: !!(snap && snap.exists) };
+            if (snap && snap.exists) {
+                const d = snap.data() || {};
+                fbBackup.updatedAt = d.updatedAt || d.savedAt || d.at || null;
+                fbBackup.fields = Object.keys(d).slice(0, 10);
+            }
+            const sample = await db.collection('user_backups').limit(5).get();
+            fbBackup.collectionCount = sample.size;
+        }
+    }
+    catch (e) {
+        fbBackup = { error: (e && e.message) || String(e) };
+    }
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
