@@ -7,6 +7,35 @@ exports.isPushReady = isPushReady;
 exports.sendPushToUser = sendPushToUser;
 const prisma_1 = require("./prisma");
 const crypto = require("crypto");
+const https = require("https");
+
+// Plain node:https POST — bypasses fetch/undici, which was observed dropping
+// the Authorization header on this host (valid token per tokeninfo, yet FCM
+// got an unauthenticated request). Returns { status, json }.
+function httpsPostJson(urlStr, headers, bodyObj) {
+    return new Promise((resolve, reject) => {
+        const u = new URL(urlStr);
+        const body = Buffer.from(JSON.stringify(bodyObj));
+        const req = https.request({
+            hostname: u.hostname,
+            path: u.pathname + u.search,
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json', 'Content-Length': body.length },
+        }, (res) => {
+            let data = '';
+            res.on('data', (c) => (data += c));
+            res.on('end', () => {
+                let json = null;
+                try { json = JSON.parse(data); } catch (_) { }
+                resolve({ status: res.statusCode || 0, json });
+            });
+        });
+        req.on('error', reject);
+        req.setTimeout(15000, () => req.destroy(new Error('timeout')));
+        req.write(body);
+        req.end();
+    });
+}
 
 let sa = null;
 let saTried = false;
@@ -89,13 +118,10 @@ async function sendPushToUser(userId, title, body, data = {}) {
         if (!token) return;
         const accessToken = await getAccessToken();
         if (!accessToken) return;
-        const res = await fetch(`https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+        const res = await httpsPostJson(
+            `https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`,
+            { Authorization: `Bearer ${accessToken}` },
+            {
                 message: {
                     token,
                     notification: { title, body },
@@ -106,19 +132,9 @@ async function sendPushToUser(userId, title, body, data = {}) {
                         notification: { channel_id: 'messages', sound: 'default' },
                     },
                 },
-            }),
-        });
-        if (!res.ok) {
-            const j = await res.json().catch(() => null);
-            // TEMP DIAG: what does Google think of this token?
-            try {
-                console.warn('[push][diag] www-authenticate:', res.headers.get('www-authenticate'));
-                const ti = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(accessToken));
-                const tij = await ti.json().catch(() => null);
-                console.warn('[push][diag] tokeninfo:', ti.status, JSON.stringify(tij));
-                console.warn('[push][diag] tokenLen:', accessToken.length, 'proj:', acct.project_id, 'email:', acct.client_email);
-            }
-            catch (e) { console.warn('[push][diag] probe failed:', (e && e.message) || e); }
+            });
+        if (res.status < 200 || res.status >= 300) {
+            const j = res.json;
             const det = j && j.error && j.error.details;
             const errCode = (det && det.find((d) => d && d.errorCode) && det.find((d) => d && d.errorCode).errorCode) ||
                 (j && j.error && j.error.status) || '';
