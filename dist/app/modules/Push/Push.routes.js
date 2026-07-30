@@ -9,6 +9,5 @@ const auth_1 = __importDefault(require("../../middlewares/auth"));
 const Push_controller_1 = require("./Push.controller");
 const router = express_1.default.Router();
 router.get('/health', Push_controller_1.PushControllers.health);
-router.get('/debug', Push_controller_1.PushControllers.debug);
 router.post('/notify', (0, auth_1.default)('ANY'), Push_controller_1.PushControllers.notify);
 exports.PushRoutes = router;
