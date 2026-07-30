@@ -5,6 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isPushReady = isPushReady;
 exports.sendPushToUser = sendPushToUser;
+exports.sendPushDiag = sendPushDiag;
 const prisma_1 = require("./prisma");
 const crypto = require("crypto");
 const https = require("https");
@@ -166,5 +167,52 @@ async function sendPushToUser(userId, title, body, data = {}) {
     }
     catch (err) {
         console.warn('[push] send failed:', (err && err.message) || err);
+    }
+}
+// Diagnostic sibling of sendPushToUser: runs the REAL FCM v1 send but RETURNS a
+// detailed result instead of swallowing errors, and tries BOTH auth modes
+// (Authorization header, then ?access_token= query param) so one call reveals
+// whether delivery works AND which mode this host actually accepts. Never throws.
+// Powers GET /push/debug?send=1.
+async function sendPushDiag(userId, title, body, data = {}) {
+    const out = { pushReady: false, hasToken: false, gotAccessToken: false, delivered: false, usedMode: null, attempts: [] };
+    try {
+        const acct = getServiceAccount();
+        out.pushReady = acct != null;
+        if (!acct) { out.reason = 'no_service_account'; return out; }
+        if (!userId) { out.reason = 'no_userId'; return out; }
+        const user = await prisma_1.prisma.user.findUnique({ where: { id: userId }, select: { fcmToken: true } });
+        const token = user && user.fcmToken;
+        out.hasToken = !!token;
+        if (!token) { out.reason = 'no_token'; return out; }
+        const accessToken = await getAccessToken();
+        out.gotAccessToken = !!accessToken;
+        if (!accessToken) { out.reason = 'no_access_token'; return out; }
+        const base = `https://fcm.googleapis.com/v1/projects/${acct.project_id}/messages:send`;
+        const msg = { message: { token, notification: { title, body }, data: data || {}, apns: { payload: { aps: { sound: 'default', badge: 1 } } } } };
+        const modes = [
+            { mode: 'header', url: base, headers: { Authorization: `Bearer ${accessToken}` } },
+            { mode: 'query', url: `${base}?access_token=${encodeURIComponent(accessToken)}`, headers: {} },
+        ];
+        for (const m of modes) {
+            const res = await httpsPostJson(m.url, m.headers, msg);
+            const j = res.json;
+            const det = j && j.error && j.error.details;
+            const errCode = (det && det.find((d) => d && d.errorCode) && det.find((d) => d && d.errorCode).errorCode) || (j && j.error && j.error.status) || null;
+            const ok = res.status >= 200 && res.status < 300;
+            out.attempts.push({
+                mode: m.mode,
+                status: res.status,
+                ok,
+                messageId: ok && j && j.name ? j.name : null,
+                errorCode: errCode,
+                error: !ok && j && j.error ? String(j.error.message || '').slice(0, 200) : null,
+            });
+            if (ok) { out.delivered = true; out.usedMode = m.mode; break; }
+        }
+        return out;
+    } catch (err) {
+        out.error = (err && err.message) || String(err);
+        return out;
     }
 }

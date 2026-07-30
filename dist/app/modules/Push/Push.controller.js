@@ -68,25 +68,11 @@ const debug = (0, catchAsync_1.default)(async (req, res) => {
     }
     const token = user.fcmToken || null;
     let sendResult = null;
-    if (doSend && token && (0, fcm_1.isPushReady)()) {
-        try {
-            const admin = require('firebase-admin');
-            const id = await admin.messaging().send({
-                token,
-                notification: { title: 'GoalShare test', body: 'Push is working ✅' },
-                apns: { payload: { aps: { sound: 'default', badge: 1 } } },
-            });
-            sendResult = { ok: true, id };
-        }
-        catch (err) {
-            sendResult = {
-                ok: false,
-                code: (err && err.errorInfo && err.errorInfo.code) ||
-                    (err && err.code) ||
-                    'unknown',
-                message: (err && err.message) || String(err),
-            };
-        }
+    if (doSend && token) {
+        // Fire through the REAL FCM v1 send path (sendPushDiag) — NOT firebase-admin,
+        // which is the broken path — and capture the exact result, so this endpoint
+        // proves whether delivery actually works and which auth mode this host accepts.
+        sendResult = await (0, fcm_1.sendPushDiag)(user.id, 'GoalShare test', 'Push is working ✅', { type: 'debug' });
     }
     let lastFcmHit = null;
     try {
