@@ -1,0 +1,82 @@
+// Accountability Buddies — the cross-user half of the feature.
+//
+// AccountabilityProfile is the weekly matching pool + the public reputation
+// (avgRating / cycles). AccountabilityMatch is a 7-day pairing. Buddy identity
+// + icebreaker are denormalised onto the match so a client can render the other
+// person without holding their profile. ids are stored as plain ObjectId
+// strings (no Prisma relations) to keep this module self-contained.
+model AccountabilityProfile {
+    id     String @id @default(auto()) @map("_id") @db.ObjectId
+    userId String @unique @db.ObjectId
+
+    // Identity / icebreaker (denormalised for buddy cards).
+    displayName String @default("")
+    avatarUrl   String @default("")
+    gender      String @default("Unspecified")
+    focusArea   String @default("")
+    monthlyGoal String @default("")
+    funFact     String @default("")
+
+    // Matching inputs.
+    timezone             String  @default("")
+    genderPreference     String  @default("NoPreference")
+    openToOtherGoalAreas Boolean @default(true)
+    extendPreference     String  @default("LetsSee")
+
+    // Public reputation.
+    avgRating       Float @default(0)
+    totalRatings    Int   @default(0)
+    cyclesCompleted Int   @default(0)
+
+    // Cycle state.
+    optedInForNextCycle Boolean @default(false)
+    currentMatchId      String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("accountabilityprofile")
+}
+
+model AccountabilityMatch {
+    id      String @id @default(auto()) @map("_id") @db.ObjectId
+    userAId String @db.ObjectId
+    userBId String @db.ObjectId
+
+    weekStartDate DateTime
+    weekEndDate   DateTime
+    status        String   @default("active") // active | completed | expired
+
+    userARating   Int?
+    userBRating   Int?
+    userARatedAt  DateTime?
+    userBRatedAt  DateTime?
+    userAComment  String    @default("")
+    userBComment  String    @default("")
+
+    extendRequestedByA Boolean @default(false)
+    extendRequestedByB Boolean @default(false)
+    checkInCountA      Int     @default(0)
+    checkInCountB      Int     @default(0)
+
+    // Denormalised buddy identity + icebreaker for each side.
+    userAName      String @default("")
+    userBName      String @default("")
+    userAAvatar    String @default("")
+    userBAvatar    String @default("")
+    userAFocus     String @default("")
+    userBFocus     String @default("")
+    userAGoal      String @default("")
+    userBGoal      String @default("")
+    userAFunFact   String @default("")
+    userBFunFact   String @default("")
+    userARatingAvg Float  @default(0)
+    userBRatingAvg Float  @default(0)
+    userACycles    Int    @default(0)
+    userBCycles    Int    @default(0)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("accountabilitymatch")
+}

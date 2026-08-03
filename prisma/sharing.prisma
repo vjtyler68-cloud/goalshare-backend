@@ -1,0 +1,19 @@
+// Buddy sharing — an owner grants specific friends a view of their nutrition
+// and/or workout summary. Access is enforced here: a viewer only receives a
+// section if their id is on the matching grant list. Summaries are stored as
+// JSON strings (parsed on read) to avoid Prisma's Json-null typing dance.
+model SharingProfile {
+    id      String @id @default(auto()) @map("_id") @db.ObjectId
+    ownerId String @unique @db.ObjectId
+
+    nutritionViewerIds String[] @db.ObjectId
+    workoutViewerIds   String[] @db.ObjectId
+
+    nutritionSummary String? // JSON blob, null when shared with nobody
+    workoutSummary   String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("sharingprofile")
+}

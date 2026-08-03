@@ -21,6 +21,8 @@ const Leads_routes_1 = require("../modules/Leads/Leads.routes");
 const Friends_routes_1 = require("../modules/Friends/Friends.routes");
 const Push_routes_1 = require("../modules/Push/Push.routes");
 const Data_routes_1 = require("../modules/Data/Data.routes");
+const Accountability_routes_1 = require("../modules/Accountability/Accountability.routes");
+const Sharing_routes_1 = require("../modules/Sharing/Sharing.routes");
 const router = express_1.default.Router();
 const moduleRoutes = [
     {
@@ -90,6 +92,14 @@ const moduleRoutes = [
     {
         path: '/data',
         route: Data_routes_1.DataRoutes,
+    },
+    {
+        path: '/accountability',
+        route: Accountability_routes_1.AccountabilityRoutes,
+    },
+    {
+        path: '/sharing',
+        route: Sharing_routes_1.SharingRoutes,
     },
 ];
 moduleRoutes.forEach(route => router.use(route.path, route.route));

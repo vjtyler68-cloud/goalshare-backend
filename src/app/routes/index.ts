@@ -16,6 +16,8 @@ import { LeadsRoutes } from '../modules/Leads/Leads.routes';
 import { DataRoutes } from '../modules/Data/Data.routes';
 import { FriendsRoutes } from '../modules/Friends/Friends.routes';
 import { PushRoutes } from '../modules/Push/Push.routes';
+import { AccountabilityRoutes } from '../modules/Accountability/Accountability.routes';
+import { SharingRoutes } from '../modules/Sharing/Sharing.routes';
 
 const router = express.Router();
 
@@ -87,6 +89,14 @@ const moduleRoutes = [
   {
     path: '/data',
     route: DataRoutes,
+  },
+  {
+    path: '/accountability',
+    route: AccountabilityRoutes,
+  },
+  {
+    path: '/sharing',
+    route: SharingRoutes,
   },
 ];
 
