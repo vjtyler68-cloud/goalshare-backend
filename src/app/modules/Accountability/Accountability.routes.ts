@@ -13,8 +13,13 @@ router.post('/profile', auth('ANY'), AccountabilityControllers.upsertProfile);
 router.post('/optin', auth('ANY'), AccountabilityControllers.setOptIn);
 
 // Current match + cycle actions.
+router.post('/friend-match', auth('ANY'), AccountabilityControllers.createFriendMatch);
 router.get('/match', auth('ANY'), AccountabilityControllers.getCurrentMatch);
 router.post('/checkin', auth('ANY'), AccountabilityControllers.logCheckIn);
+router.post('/verify', auth('ANY'), AccountabilityControllers.verifyProof);
+router.get('/checkins', auth('ANY'), AccountabilityControllers.getCheckins);
+router.post('/goals', auth('ANY'), AccountabilityControllers.setGoals);
+router.get('/buddy-goals', auth('ANY'), AccountabilityControllers.getBuddyGoals);
 router.post('/extend', auth('ANY'), AccountabilityControllers.requestExtend);
 router.post('/rate', auth('ANY'), AccountabilityControllers.submitRating);
 

@@ -47,6 +47,16 @@ const setOptIn = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 
         data: result,
     });
 }));
+const createFriendMatch = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Accountability_service_1.AccountabilityServices.createFriendMatch(req.user.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Buddy matched',
+        data: result,
+    });
+}));
 const getCurrentMatch = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield Accountability_service_1.AccountabilityServices.getCurrentMatch(req.user.id);
     (0, sendResponse_1.default)(res, {
@@ -57,11 +67,50 @@ const getCurrentMatch = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
     });
 }));
 const logCheckIn = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield Accountability_service_1.AccountabilityServices.logCheckIn(req.user.id);
+    var _a;
+    const result = yield Accountability_service_1.AccountabilityServices.logCheckIn(req.user.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,
         message: 'Checked in',
+        data: result,
+    });
+}));
+const verifyProof = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Accountability_service_1.AccountabilityServices.verifyProof(req.user.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Proof reviewed',
+        data: result,
+    });
+}));
+const getCheckins = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Accountability_service_1.AccountabilityServices.getCheckins(req.user.id);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Check-ins',
+        data: result,
+    });
+}));
+const setGoals = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Accountability_service_1.AccountabilityServices.setGoals(req.user.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Goals shared',
+        data: result,
+    });
+}));
+const getBuddyGoals = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Accountability_service_1.AccountabilityServices.getBuddyGoals(req.user.id);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Buddy goals',
         data: result,
     });
 }));
@@ -102,11 +151,16 @@ const runWeeklyPairing = (0, catchAsync_1.default)((req, res) => __awaiter(void 
     });
 }));
 exports.AccountabilityControllers = {
+    createFriendMatch,
     upsertProfile,
     getMyProfile,
     setOptIn,
     getCurrentMatch,
     logCheckIn,
+    verifyProof,
+    getCheckins,
+    setGoals,
+    getBuddyGoals,
     requestExtend,
     submitRating,
     runWeeklyPairing,

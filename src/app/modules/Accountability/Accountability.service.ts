@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CYCLE_DAYS = 7;
 const MIN_CHECKINS_TO_RATE = 2;
+const OID = /^[a-f0-9]{24}$/i;
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -74,15 +75,124 @@ const requireMyMatch = async (myId: string) => {
   return m;
 };
 
-const logCheckIn = async (myId: string) => {
+// ── Daily Proof / check-ins ──────────────────────────────────────────────────
+const pad = (n: number) => n.toString().padStart(2, '0');
+const serverDate = () => {
+  const n = new Date();
+  return `${n.getUTCFullYear()}-${pad(n.getUTCMonth() + 1)}-${pad(n.getUTCDate())}`;
+};
+const addDays = (dateStr: string, delta: number) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+};
+
+/** Check in for the day (once), optionally attaching proof. Re-calling the same
+ *  day updates the proof but never double-counts (the anti-spam guard). */
+const logCheckIn = async (myId: string, body: any) => {
   const m = await requireMyMatch(myId);
   const isA = m.userAId === myId;
-  return prisma.accountabilityMatch.update({
+  const date = ((body?.date ?? '').toString() || serverDate()).slice(0, 10);
+  const proofUrl = (body?.proofUrl ?? '').toString();
+  const note = (body?.note ?? '').toString();
+
+  const existing = await prisma.accountabilityCheckin.findFirst({
+    where: { matchId: m.id, userId: myId, date },
+  });
+  if (existing) {
+    return prisma.accountabilityCheckin.update({
+      where: { id: existing.id },
+      data: {
+        proofUrl: proofUrl || existing.proofUrl,
+        note: note || existing.note,
+      },
+    });
+  }
+  const created = await prisma.accountabilityCheckin.create({
+    data: { matchId: m.id, userId: myId, date, proofUrl, note },
+  });
+  // Keep the rating-gate counter roughly in sync (distinct days checked in).
+  await prisma.accountabilityMatch.update({
     where: { id: m.id },
     data: isA
       ? { checkInCountA: m.checkInCountA + 1 }
       : { checkInCountB: m.checkInCountB + 1 },
   });
+  return created;
+};
+
+/** The partner marks the OTHER person's proof verified or "doesn't count". */
+const verifyProof = async (myId: string, body: any) => {
+  const checkinId = (body?.checkinId ?? '').toString();
+  const verified = body?.verified === true;
+  const m = await requireMyMatch(myId);
+  const c = await prisma.accountabilityCheckin.findUnique({
+    where: { id: checkinId },
+  });
+  if (!c || c.matchId !== m.id) {
+    throw new AppError(httpStatus.NOT_FOUND, 'Check-in not found.');
+  }
+  if (c.userId === myId) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'You can only verify your buddy.');
+  }
+  await prisma.accountabilityCheckin.update({
+    where: { id: c.id },
+    data: { verified },
+  });
+  return { ok: true };
+};
+
+/** Recent days for both users + the shared "Our Streak" (consecutive days where
+ *  BOTH checked in and neither proof was rejected). */
+const getCheckins = async (myId: string) => {
+  const empty = { ourStreak: 0, days: [] as any[] };
+  const m = await getCurrentMatch(myId);
+  if (!m) return empty;
+  const rows = await prisma.accountabilityCheckin.findMany({
+    where: { matchId: m.id },
+    orderBy: { date: 'desc' },
+  });
+  const shape = (c: any) =>
+    c ? { id: c.id, proofUrl: c.proofUrl, note: c.note, verified: c.verified } : null;
+  const byDate: Record<string, { mine?: any; buddy?: any }> = {};
+  for (const r of rows) {
+    byDate[r.date] ||= {};
+    if (r.userId === myId) byDate[r.date].mine = r;
+    else byDate[r.date].buddy = r;
+  }
+  const counts = (rec: { mine?: any; buddy?: any } | undefined) =>
+    !!rec &&
+    !!rec.mine &&
+    !!rec.buddy &&
+    rec.mine.verified !== false &&
+    rec.buddy.verified !== false;
+
+  const countingDates = Object.keys(byDate).filter(d => counts(byDate[d]));
+  let ourStreak = 0;
+  if (countingDates.length) {
+    countingDates.sort();
+    const set = new Set(countingDates);
+    let cur = countingDates[countingDates.length - 1];
+    ourStreak = 1;
+    while (set.has(addDays(cur, -1))) {
+      ourStreak++;
+      cur = addDays(cur, -1);
+    }
+  }
+
+  const days = Object.keys(byDate)
+    .sort()
+    .reverse()
+    .slice(0, 21)
+    .map(date => ({
+      date,
+      counts: counts(byDate[date]),
+      mine: shape(byDate[date].mine),
+      buddy: shape(byDate[date].buddy),
+    }));
+
+  return { ourStreak, days };
 };
 
 const requestExtend = async (myId: string, value: boolean) => {
@@ -146,6 +256,35 @@ const submitRating = async (myId: string, stars: number, comment: string) => {
     .catch(() => undefined);
 
   return { ok: true };
+};
+
+// ── Goals shared with the buddy ──────────────────────────────────────────────
+/** Store the user's goals (a JSON array) so their buddy can see what they're
+ *  working toward. Creates a minimal profile row if none exists yet. */
+const setGoals = async (myId: string, body: any) => {
+  const goals = body?.goals != null ? JSON.stringify(body.goals) : null;
+  await prisma.accountabilityProfile.upsert({
+    where: { userId: myId },
+    create: { userId: myId, goals },
+    update: { goals },
+  });
+  return { ok: true };
+};
+
+/** The current buddy's shared goals (empty when unmatched / none set). */
+const getBuddyGoals = async (myId: string) => {
+  const m = await getCurrentMatch(myId);
+  if (!m) return { goals: [] as unknown[] };
+  const buddyId = m.userAId === myId ? m.userBId : m.userAId;
+  const bp = await prisma.accountabilityProfile.findUnique({
+    where: { userId: buddyId },
+  });
+  if (!bp || !bp.goals) return { goals: [] as unknown[] };
+  try {
+    return { goals: JSON.parse(bp.goals) };
+  } catch {
+    return { goals: [] as unknown[] };
+  }
 };
 
 // ── Weekly pairing ──────────────────────────────────────────────────────────
@@ -303,12 +442,86 @@ const runWeeklyPairing = async () => {
   };
 };
 
+/** Create a match with a chosen friend (the app's friends-based path), so the
+ *  pairing + daily check-ins live on the backend and both phones share them. */
+const createFriendMatch = async (myId: string, body: any) => {
+  const buddyId = (body?.buddyId ?? '').toString();
+  if (!buddyId || buddyId === myId || !OID.test(buddyId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Invalid buddy.');
+  }
+  const myProfile = await prisma.accountabilityProfile.findUnique({
+    where: { userId: myId },
+  });
+  const meUser = await prisma.user.findUnique({
+    where: { id: myId },
+    select: { fullName: true, profile: true },
+  });
+  const buddyProfile = await prisma.accountabilityProfile.findUnique({
+    where: { userId: buddyId },
+  });
+  const buUser = await prisma.user.findUnique({
+    where: { id: buddyId },
+    select: { fullName: true, profile: true },
+  });
+
+  const now = new Date();
+  const match = await prisma.accountabilityMatch.create({
+    data: {
+      userAId: myId,
+      userBId: buddyId,
+      weekStartDate: now,
+      weekEndDate: new Date(now.getTime() + CYCLE_DAYS * DAY_MS),
+      status: 'active',
+      userAName: myProfile?.displayName || meUser?.fullName || 'You',
+      userBName:
+        (body?.buddyName ?? '').toString() ||
+        buddyProfile?.displayName ||
+        buUser?.fullName ||
+        'Buddy',
+      userAAvatar: myProfile?.avatarUrl || meUser?.profile || '',
+      userBAvatar:
+        (body?.buddyAvatar ?? '').toString() ||
+        buddyProfile?.avatarUrl ||
+        buUser?.profile ||
+        '',
+      userAFocus: myProfile?.focusArea || '',
+      userBFocus: buddyProfile?.focusArea || '',
+      userAGoal: myProfile?.monthlyGoal || '',
+      userBGoal: buddyProfile?.monthlyGoal || '',
+      userAFunFact: myProfile?.funFact || '',
+      userBFunFact: buddyProfile?.funFact || '',
+      userARatingAvg: myProfile?.avgRating || 0,
+      userBRatingAvg: buddyProfile?.avgRating || 0,
+      userACycles: myProfile?.cyclesCompleted || 0,
+      userBCycles: buddyProfile?.cyclesCompleted || 0,
+    },
+  });
+  if (myProfile) {
+    await prisma.accountabilityProfile.update({
+      where: { userId: myId },
+      data: { currentMatchId: match.id, optedInForNextCycle: false },
+    });
+  }
+  if (buddyProfile) {
+    await prisma.accountabilityProfile.update({
+      where: { userId: buddyId },
+      data: { currentMatchId: match.id, optedInForNextCycle: false },
+    });
+  }
+  return match;
+};
+
 export const AccountabilityServices = {
+  createFriendMatch,
   upsertProfile,
   getMyProfile,
   setOptIn,
   getCurrentMatch,
   logCheckIn,
+  verifyProof,
+  getCheckins,
+  setGoals,
+  getBuddyGoals,
   requestExtend,
   submitRating,
   runWeeklyPairing,

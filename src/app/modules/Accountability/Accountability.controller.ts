@@ -41,6 +41,19 @@ const setOptIn = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const createFriendMatch = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.createFriendMatch(
+    req.user.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Buddy matched',
+    data: result,
+  });
+});
+
 const getCurrentMatch = catchAsync(async (req: Request, res: Response) => {
   const result = await AccountabilityServices.getCurrentMatch(req.user.id);
   sendResponse(res, {
@@ -52,11 +65,60 @@ const getCurrentMatch = catchAsync(async (req: Request, res: Response) => {
 });
 
 const logCheckIn = catchAsync(async (req: Request, res: Response) => {
-  const result = await AccountabilityServices.logCheckIn(req.user.id);
+  const result = await AccountabilityServices.logCheckIn(
+    req.user.id,
+    req.body ?? {},
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Checked in',
+    data: result,
+  });
+});
+
+const verifyProof = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.verifyProof(
+    req.user.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Proof reviewed',
+    data: result,
+  });
+});
+
+const getCheckins = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.getCheckins(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Check-ins',
+    data: result,
+  });
+});
+
+const setGoals = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.setGoals(
+    req.user.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Goals shared',
+    data: result,
+  });
+});
+
+const getBuddyGoals = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.getBuddyGoals(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Buddy goals',
     data: result,
   });
 });
@@ -105,11 +167,16 @@ const runWeeklyPairing = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const AccountabilityControllers = {
+  createFriendMatch,
   upsertProfile,
   getMyProfile,
   setOptIn,
   getCurrentMatch,
   logCheckIn,
+  verifyProof,
+  getCheckins,
+  setGoals,
+  getBuddyGoals,
   requestExtend,
   submitRating,
   runWeeklyPairing,

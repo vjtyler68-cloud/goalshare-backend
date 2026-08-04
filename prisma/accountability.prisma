@@ -28,6 +28,9 @@ model AccountabilityProfile {
     totalRatings    Int   @default(0)
     cyclesCompleted Int   @default(0)
 
+    // The user's goals, shared with their buddy (JSON array as a string).
+    goals String?
+
     // Cycle state.
     optedInForNextCycle Boolean @default(false)
     currentMatchId      String?
@@ -79,4 +82,25 @@ model AccountabilityMatch {
     updatedAt DateTime @updatedAt
 
     @@map("accountabilitymatch")
+}
+
+// Daily Proof — one row per (match, user, day). Once-a-day is enforced in the
+// service. proofUrl/note are the user's uploaded proof; verified is set by the
+// PARTNER (null = pending, true = verified, false = doesn't count). A day counts
+// toward "Our Streak" only when BOTH users have a row for it and neither is
+// rejected.
+model AccountabilityCheckin {
+    id      String @id @default(auto()) @map("_id") @db.ObjectId
+    matchId String @db.ObjectId
+    userId  String @db.ObjectId
+    date    String // yyyy-mm-dd in the user's local time (sent by the app)
+
+    proofUrl String  @default("")
+    note     String  @default("")
+    verified Boolean? // set by the partner
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("accountabilitycheckin")
 }
