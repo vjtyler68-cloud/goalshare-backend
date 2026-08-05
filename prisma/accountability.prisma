@@ -104,3 +104,16 @@ model AccountabilityCheckin {
 
     @@map("accountabilitycheckin")
 }
+
+// A voice note sent within a match. audioUrl points at the uploaded clip.
+model AccountabilityVoiceMessage {
+    id         String @id @default(auto()) @map("_id") @db.ObjectId
+    matchId    String @db.ObjectId
+    senderId   String @db.ObjectId
+    audioUrl   String
+    durationMs Int    @default(0)
+
+    createdAt DateTime @default(now())
+
+    @@map("accountabilityvoicemessage")
+}

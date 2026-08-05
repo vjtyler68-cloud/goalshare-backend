@@ -95,6 +95,25 @@ const getCheckins = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
         data: result,
     });
 }));
+const sendVoice = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Accountability_service_1.AccountabilityServices.sendVoice(req.user.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Voice sent',
+        data: result,
+    });
+}));
+const getVoiceMessages = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Accountability_service_1.AccountabilityServices.getVoiceMessages(req.user.id);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Voice messages',
+        data: result,
+    });
+}));
 const setGoals = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const result = yield Accountability_service_1.AccountabilityServices.setGoals(req.user.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
@@ -159,6 +178,8 @@ exports.AccountabilityControllers = {
     logCheckIn,
     verifyProof,
     getCheckins,
+    sendVoice,
+    getVoiceMessages,
     setGoals,
     getBuddyGoals,
     requestExtend,

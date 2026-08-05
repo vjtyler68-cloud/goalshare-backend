@@ -20,6 +20,8 @@ router.get('/match', (0, auth_1.default)('ANY'), Accountability_controller_1.Acc
 router.post('/checkin', (0, auth_1.default)('ANY'), Accountability_controller_1.AccountabilityControllers.logCheckIn);
 router.post('/verify', (0, auth_1.default)('ANY'), Accountability_controller_1.AccountabilityControllers.verifyProof);
 router.get('/checkins', (0, auth_1.default)('ANY'), Accountability_controller_1.AccountabilityControllers.getCheckins);
+router.post('/voice', (0, auth_1.default)('ANY'), Accountability_controller_1.AccountabilityControllers.sendVoice);
+router.get('/voice', (0, auth_1.default)('ANY'), Accountability_controller_1.AccountabilityControllers.getVoiceMessages);
 router.post('/goals', (0, auth_1.default)('ANY'), Accountability_controller_1.AccountabilityControllers.setGoals);
 router.get('/buddy-goals', (0, auth_1.default)('ANY'), Accountability_controller_1.AccountabilityControllers.getBuddyGoals);
 router.post('/extend', (0, auth_1.default)('ANY'), Accountability_controller_1.AccountabilityControllers.requestExtend);

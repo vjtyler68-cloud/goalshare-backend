@@ -100,6 +100,29 @@ const getCheckins = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const sendVoice = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.sendVoice(
+    req.user.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Voice sent',
+    data: result,
+  });
+});
+
+const getVoiceMessages = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.getVoiceMessages(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Voice messages',
+    data: result,
+  });
+});
+
 const setGoals = catchAsync(async (req: Request, res: Response) => {
   const result = await AccountabilityServices.setGoals(
     req.user.id,
@@ -175,6 +198,8 @@ export const AccountabilityControllers = {
   logCheckIn,
   verifyProof,
   getCheckins,
+  sendVoice,
+  getVoiceMessages,
   setGoals,
   getBuddyGoals,
   requestExtend,

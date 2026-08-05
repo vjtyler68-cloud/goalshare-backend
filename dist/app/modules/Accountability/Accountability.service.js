@@ -253,6 +253,38 @@ const submitRating = (myId, stars, comment) => __awaiter(void 0, void 0, void 0,
         .catch(() => undefined);
     return { ok: true };
 });
+// ── Voice messages ───────────────────────────────────────────────────────────
+const sendVoice = (myId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const audioUrl = ((_a = body === null || body === void 0 ? void 0 : body.audioUrl) !== null && _a !== void 0 ? _a : '').toString();
+    const durationMs = Number(body === null || body === void 0 ? void 0 : body.durationMs) || 0;
+    if (!audioUrl)
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'No audio provided.');
+    const m = yield requireMyMatch(myId);
+    return prisma.accountabilityVoiceMessage.create({
+        data: { matchId: m.id, senderId: myId, audioUrl, durationMs },
+    });
+});
+const getVoiceMessages = (myId) => __awaiter(void 0, void 0, void 0, function* () {
+    const m = yield getCurrentMatch(myId);
+    if (!m)
+        return { messages: [] };
+    const rows = yield prisma.accountabilityVoiceMessage.findMany({
+        where: { matchId: m.id },
+        orderBy: { createdAt: 'asc' },
+        take: 100,
+    });
+    return {
+        messages: rows.map(r => ({
+            id: r.id,
+            senderId: r.senderId,
+            audioUrl: r.audioUrl,
+            durationMs: r.durationMs,
+            createdAt: r.createdAt.toISOString(),
+            mine: r.senderId === myId,
+        })),
+    };
+});
 // ── Goals shared with the buddy ──────────────────────────────────────────────
 /** Store the user's goals (a JSON array) so their buddy can see what they're
  *  working toward. Creates a minimal profile row if none exists yet. */
@@ -504,6 +536,8 @@ exports.AccountabilityServices = {
     logCheckIn,
     verifyProof,
     getCheckins,
+    sendVoice,
+    getVoiceMessages,
     setGoals,
     getBuddyGoals,
     requestExtend,

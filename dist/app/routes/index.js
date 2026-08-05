@@ -18,11 +18,12 @@ const budget_routes_1 = require("../modules/budget/budget.routes");
 const payment_route_1 = require("../modules/Payment/payment.route");
 const Global_routes_1 = require("../modules/Global/Global.routes");
 const Leads_routes_1 = require("../modules/Leads/Leads.routes");
+const Data_routes_1 = require("../modules/Data/Data.routes");
 const Friends_routes_1 = require("../modules/Friends/Friends.routes");
 const Push_routes_1 = require("../modules/Push/Push.routes");
-const Data_routes_1 = require("../modules/Data/Data.routes");
 const Accountability_routes_1 = require("../modules/Accountability/Accountability.routes");
 const Sharing_routes_1 = require("../modules/Sharing/Sharing.routes");
+const Circles_routes_1 = require("../modules/Circles/Circles.routes");
 const router = express_1.default.Router();
 const moduleRoutes = [
     {
@@ -100,6 +101,10 @@ const moduleRoutes = [
     {
         path: '/sharing',
         route: Sharing_routes_1.SharingRoutes,
+    },
+    {
+        path: '/circles',
+        route: Circles_routes_1.CirclesRoutes,
     },
 ];
 moduleRoutes.forEach(route => router.use(route.path, route.route));

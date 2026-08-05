@@ -18,6 +18,8 @@ router.get('/match', auth('ANY'), AccountabilityControllers.getCurrentMatch);
 router.post('/checkin', auth('ANY'), AccountabilityControllers.logCheckIn);
 router.post('/verify', auth('ANY'), AccountabilityControllers.verifyProof);
 router.get('/checkins', auth('ANY'), AccountabilityControllers.getCheckins);
+router.post('/voice', auth('ANY'), AccountabilityControllers.sendVoice);
+router.get('/voice', auth('ANY'), AccountabilityControllers.getVoiceMessages);
 router.post('/goals', auth('ANY'), AccountabilityControllers.setGoals);
 router.get('/buddy-goals', auth('ANY'), AccountabilityControllers.getBuddyGoals);
 router.post('/extend', auth('ANY'), AccountabilityControllers.requestExtend);

@@ -1,0 +1,35 @@
+// Goal Circles — squads of 3-5 people doing daily accountability together.
+// Members are denormalised (name/avatar) so a circle renders without extra
+// lookups. Shields save the shared streak on a bad day (2 per circle); a burned
+// shield adds that date to shieldedDates so it still counts.
+model AccountabilityCircle {
+    id            String   @id @default(auto()) @map("_id") @db.ObjectId
+    name          String   @default("")
+    ownerId       String   @db.ObjectId
+    memberIds     String[] @db.ObjectId
+    memberNames   String[]
+    memberAvatars String[]
+
+    shields       Int      @default(2)
+    shieldedDates String[] // yyyy-mm-dd days saved by a burned shield
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("accountabilitycircle")
+}
+
+model AccountabilityCircleCheckin {
+    id       String @id @default(auto()) @map("_id") @db.ObjectId
+    circleId String @db.ObjectId
+    userId   String @db.ObjectId
+    date     String // yyyy-mm-dd (member's local day)
+
+    proofUrl String @default("")
+    note     String @default("")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("accountabilitycirclecheckin")
+}

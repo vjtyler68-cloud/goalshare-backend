@@ -18,6 +18,7 @@ import { FriendsRoutes } from '../modules/Friends/Friends.routes';
 import { PushRoutes } from '../modules/Push/Push.routes';
 import { AccountabilityRoutes } from '../modules/Accountability/Accountability.routes';
 import { SharingRoutes } from '../modules/Sharing/Sharing.routes';
+import { CirclesRoutes } from '../modules/Circles/Circles.routes';
 
 const router = express.Router();
 
@@ -97,6 +98,10 @@ const moduleRoutes = [
   {
     path: '/sharing',
     route: SharingRoutes,
+  },
+  {
+    path: '/circles',
+    route: CirclesRoutes,
   },
 ];
 

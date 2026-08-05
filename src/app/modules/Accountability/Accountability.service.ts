@@ -258,6 +258,37 @@ const submitRating = async (myId: string, stars: number, comment: string) => {
   return { ok: true };
 };
 
+// ── Voice messages ───────────────────────────────────────────────────────────
+const sendVoice = async (myId: string, body: any) => {
+  const audioUrl = (body?.audioUrl ?? '').toString();
+  const durationMs = Number(body?.durationMs) || 0;
+  if (!audioUrl) throw new AppError(httpStatus.BAD_REQUEST, 'No audio provided.');
+  const m = await requireMyMatch(myId);
+  return prisma.accountabilityVoiceMessage.create({
+    data: { matchId: m.id, senderId: myId, audioUrl, durationMs },
+  });
+};
+
+const getVoiceMessages = async (myId: string) => {
+  const m = await getCurrentMatch(myId);
+  if (!m) return { messages: [] as unknown[] };
+  const rows = await prisma.accountabilityVoiceMessage.findMany({
+    where: { matchId: m.id },
+    orderBy: { createdAt: 'asc' },
+    take: 100,
+  });
+  return {
+    messages: rows.map(r => ({
+      id: r.id,
+      senderId: r.senderId,
+      audioUrl: r.audioUrl,
+      durationMs: r.durationMs,
+      createdAt: r.createdAt.toISOString(),
+      mine: r.senderId === myId,
+    })),
+  };
+};
+
 // ── Goals shared with the buddy ──────────────────────────────────────────────
 /** Store the user's goals (a JSON array) so their buddy can see what they're
  *  working toward. Creates a minimal profile row if none exists yet. */
@@ -520,6 +551,8 @@ export const AccountabilityServices = {
   logCheckIn,
   verifyProof,
   getCheckins,
+  sendVoice,
+  getVoiceMessages,
   setGoals,
   getBuddyGoals,
   requestExtend,
