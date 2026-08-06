@@ -43,7 +43,7 @@ const getMyProfile = catchAsync(async (req, res) => {
 
 const getUserDetails = catchAsync(async (req, res) => {
   const { id } = req.params;
-  const result = await UserServices.getUserDetailsFromDB(id);
+  const result = await UserServices.getUserDetailsFromDB(id, req.user?.id);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

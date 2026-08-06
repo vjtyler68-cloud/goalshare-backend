@@ -98,19 +98,28 @@ const getMyProfileFromDB = (id) => __awaiter(void 0, void 0, void 0, function* (
     });
     return Profile;
 });
-const getUserDetailsFromDB = (id) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserDetailsFromDB = (id, requesterId) => __awaiter(void 0, void 0, void 0, function* () {
     const user = yield prisma_1.prisma.user.findUnique({
         where: { id },
-        // select: {
-        //   id: true,
-        //   fullName: true,
-        //   email: true,
-        //   role: true,
-        //   createdAt: true,
-        //   updatedAt: true,
-        //   profile: true,
-        // },
     });
+    if (!user)
+        return user;
+    // The bio is friends-only. Return it to the user themselves, or to an
+    // accepted friend; strip it for everyone else.
+    if (requesterId && requesterId !== id) {
+        const friendship = yield prisma_1.prisma.friendRequest.findFirst({
+            where: {
+                status: 'accepted',
+                OR: [
+                    { fromId: requesterId, toId: id },
+                    { fromId: id, toId: requesterId },
+                ],
+            },
+        });
+        if (!friendship) {
+            user.bio = null;
+        }
+    }
     return user;
 });
 const updateProfileImg = (id, previousImg, req, file) => __awaiter(void 0, void 0, void 0, function* () {

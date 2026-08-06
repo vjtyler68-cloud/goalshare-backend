@@ -44,8 +44,9 @@ const getMyProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
     });
 }));
 const getUserDetails = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const { id } = req.params;
-    const result = yield user_service_1.UserServices.getUserDetailsFromDB(id);
+    const result = yield user_service_1.UserServices.getUserDetailsFromDB(id, (_a = req.user) === null || _a === void 0 ? void 0 : _a.id);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         message: 'User details retrieved successfully',
@@ -133,12 +134,13 @@ const updateUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
         data: result,
     });
 }));
-// PUT /user/fcm-token { token, platform } — register this device for push.
-const setFcmToken = (0, catchAsync_1.default)(async (req, res) => {
+// PUT /user/fcm-token  { token, platform } — register this device for push.
+const setFcmToken = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     const id = req.user.id;
-    const token = ((req.body && req.body.token) || '').toString();
+    const token = ((_b = (_a = req.body) === null || _a === void 0 ? void 0 : _a.token) !== null && _b !== void 0 ? _b : '').toString();
     if (token) {
-        await user_service_1.UserServices.updateFcmToken(id, token);
+        yield user_service_1.UserServices.updateFcmToken(id, token);
     }
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
@@ -146,7 +148,7 @@ const setFcmToken = (0, catchAsync_1.default)(async (req, res) => {
         message: 'Token registered',
         data: null,
     });
-});
+}));
 exports.UserControllers = {
     setFcmToken,
     getAllUsers,

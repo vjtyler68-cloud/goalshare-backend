@@ -101,19 +101,28 @@ const getMyProfileFromDB = async (id: string) => {
   return Profile;
 };
 
-const getUserDetailsFromDB = async (id: string) => {
+const getUserDetailsFromDB = async (id: string, requesterId?: string) => {
   const user = await prisma.user.findUnique({
     where: { id },
-    // select: {
-    //   id: true,
-    //   fullName: true,
-    //   email: true,
-    //   role: true,
-    //   createdAt: true,
-    //   updatedAt: true,
-    //   profile: true,
-    // },
   });
+  if (!user) return user;
+
+  // The bio is friends-only. Return it to the user themselves, or to an
+  // accepted friend; strip it for everyone else.
+  if (requesterId && requesterId !== id) {
+    const friendship = await prisma.friendRequest.findFirst({
+      where: {
+        status: 'accepted',
+        OR: [
+          { fromId: requesterId, toId: id },
+          { fromId: id, toId: requesterId },
+        ],
+      },
+    });
+    if (!friendship) {
+      (user as { bio?: string | null }).bio = null;
+    }
+  }
   return user;
 };
 
