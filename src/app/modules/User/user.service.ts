@@ -79,6 +79,7 @@ const getMyProfileFromDB = async (id: string) => {
       role: true,
       status: true,
       describe: true,
+      bio: true,
       city: true,
       address: true,
       profile: true,

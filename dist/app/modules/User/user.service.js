@@ -78,6 +78,7 @@ const getMyProfileFromDB = (id) => __awaiter(void 0, void 0, void 0, function* (
             role: true,
             status: true,
             describe: true,
+            bio: true,
             city: true,
             address: true,
             profile: true,
@@ -341,13 +342,13 @@ const updateUserIntoDb = (req, id) => __awaiter(void 0, void 0, void 0, function
 });
 // Store/refresh this device's FCM token so the backend can push the user.
 // Only touches fcmToken — never the `platform` field (that's used by IAP).
-const updateFcmToken = async (id, token) => {
-    await prisma_1.prisma.user.update({
+const updateFcmToken = (id, token) => __awaiter(void 0, void 0, void 0, function* () {
+    yield prisma_1.prisma.user.update({
         where: { id },
         data: { fcmToken: token },
     });
     return { success: true };
-};
+});
 exports.UserServices = {
     updateFcmToken,
     getAllUsersFromDB,
