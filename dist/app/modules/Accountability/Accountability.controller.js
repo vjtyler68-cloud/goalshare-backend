@@ -114,6 +114,25 @@ const getVoiceMessages = (0, catchAsync_1.default)((req, res) => __awaiter(void 
         data: result,
     });
 }));
+const postStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Accountability_service_1.AccountabilityServices.postStatus(req.user.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Status shared',
+        data: result,
+    });
+}));
+const getStatuses = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Accountability_service_1.AccountabilityServices.getStatuses(req.user.id);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Status updates',
+        data: result,
+    });
+}));
 const setGoals = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const result = yield Accountability_service_1.AccountabilityServices.setGoals(req.user.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
@@ -180,6 +199,8 @@ exports.AccountabilityControllers = {
     getCheckins,
     sendVoice,
     getVoiceMessages,
+    postStatus,
+    getStatuses,
     setGoals,
     getBuddyGoals,
     requestExtend,

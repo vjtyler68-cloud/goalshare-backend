@@ -285,6 +285,42 @@ const getVoiceMessages = (myId) => __awaiter(void 0, void 0, void 0, function* (
         })),
     };
 });
+// ── Daily status thread ──────────────────────────────────────────────────────
+const postStatus = (myId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const text = ((_a = body === null || body === void 0 ? void 0 : body.text) !== null && _a !== void 0 ? _a : '').toString().trim();
+    if (!text)
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'No update provided.');
+    const hitGoals = typeof (body === null || body === void 0 ? void 0 : body.hitGoals) === 'boolean' ? body.hitGoals : null;
+    const m = yield requireMyMatch(myId);
+    // Denormalize the poster's name off the match so the thread renders without
+    // a second lookup (mirrors how the match stores userAName/userBName).
+    const senderName = m.userAId === myId ? m.userAName : m.userBName;
+    return prisma.accountabilityStatus.create({
+        data: { matchId: m.id, senderId: myId, senderName, text, hitGoals },
+    });
+});
+const getStatuses = (myId) => __awaiter(void 0, void 0, void 0, function* () {
+    const m = yield getCurrentMatch(myId);
+    if (!m)
+        return { updates: [] };
+    const rows = yield prisma.accountabilityStatus.findMany({
+        where: { matchId: m.id },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+    });
+    return {
+        updates: rows.map(r => ({
+            id: r.id,
+            senderId: r.senderId,
+            senderName: r.senderName,
+            text: r.text,
+            hitGoals: r.hitGoals,
+            createdAt: r.createdAt.toISOString(),
+            mine: r.senderId === myId,
+        })),
+    };
+});
 // ── Goals shared with the buddy ──────────────────────────────────────────────
 /** Store the user's goals (a JSON array) so their buddy can see what they're
  *  working toward. Creates a minimal profile row if none exists yet. */
@@ -538,6 +574,8 @@ exports.AccountabilityServices = {
     getCheckins,
     sendVoice,
     getVoiceMessages,
+    postStatus,
+    getStatuses,
     setGoals,
     getBuddyGoals,
     requestExtend,

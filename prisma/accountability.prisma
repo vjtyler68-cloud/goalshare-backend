@@ -117,3 +117,18 @@ model AccountabilityVoiceMessage {
 
     @@map("accountabilityvoicemessage")
 }
+
+// A daily status update in the shared buddy thread — "how was my day / did I
+// hit my goals". hitGoals: true = hit, false = missed, null = not stated.
+model AccountabilityStatus {
+    id         String   @id @default(auto()) @map("_id") @db.ObjectId
+    matchId    String   @db.ObjectId
+    senderId   String   @db.ObjectId
+    senderName String   @default("")
+    text       String
+    hitGoals   Boolean?
+
+    createdAt DateTime @default(now())
+
+    @@map("accountabilitystatus")
+}

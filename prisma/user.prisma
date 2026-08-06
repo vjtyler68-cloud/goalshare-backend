@@ -13,6 +13,7 @@ model User {
   status UserStatus @default(ACTIVE)
 
   describe String?
+  bio      String? // public profile bio (<=160 chars, shown to friends)
   city     String?
   address  String?
   profile  String?

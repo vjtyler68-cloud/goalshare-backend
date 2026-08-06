@@ -123,6 +123,29 @@ const getVoiceMessages = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const postStatus = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.postStatus(
+    req.user.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Status shared',
+    data: result,
+  });
+});
+
+const getStatuses = catchAsync(async (req: Request, res: Response) => {
+  const result = await AccountabilityServices.getStatuses(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Status updates',
+    data: result,
+  });
+});
+
 const setGoals = catchAsync(async (req: Request, res: Response) => {
   const result = await AccountabilityServices.setGoals(
     req.user.id,
@@ -200,6 +223,8 @@ export const AccountabilityControllers = {
   getCheckins,
   sendVoice,
   getVoiceMessages,
+  postStatus,
+  getStatuses,
   setGoals,
   getBuddyGoals,
   requestExtend,

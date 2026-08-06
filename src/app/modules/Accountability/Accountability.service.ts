@@ -289,6 +289,42 @@ const getVoiceMessages = async (myId: string) => {
   };
 };
 
+// ── Daily status thread ──────────────────────────────────────────────────────
+const postStatus = async (myId: string, body: any) => {
+  const text = (body?.text ?? '').toString().trim();
+  if (!text) throw new AppError(httpStatus.BAD_REQUEST, 'No update provided.');
+  const hitGoals =
+    typeof body?.hitGoals === 'boolean' ? (body.hitGoals as boolean) : null;
+  const m = await requireMyMatch(myId);
+  // Denormalize the poster's name off the match so the thread renders without
+  // a second lookup (mirrors how the match stores userAName/userBName).
+  const senderName = m.userAId === myId ? m.userAName : m.userBName;
+  return prisma.accountabilityStatus.create({
+    data: { matchId: m.id, senderId: myId, senderName, text, hitGoals },
+  });
+};
+
+const getStatuses = async (myId: string) => {
+  const m = await getCurrentMatch(myId);
+  if (!m) return { updates: [] as unknown[] };
+  const rows = await prisma.accountabilityStatus.findMany({
+    where: { matchId: m.id },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
+  return {
+    updates: rows.map(r => ({
+      id: r.id,
+      senderId: r.senderId,
+      senderName: r.senderName,
+      text: r.text,
+      hitGoals: r.hitGoals,
+      createdAt: r.createdAt.toISOString(),
+      mine: r.senderId === myId,
+    })),
+  };
+};
+
 // ── Goals shared with the buddy ──────────────────────────────────────────────
 /** Store the user's goals (a JSON array) so their buddy can see what they're
  *  working toward. Creates a minimal profile row if none exists yet. */
@@ -553,6 +589,8 @@ export const AccountabilityServices = {
   getCheckins,
   sendVoice,
   getVoiceMessages,
+  postStatus,
+  getStatuses,
   setGoals,
   getBuddyGoals,
   requestExtend,
