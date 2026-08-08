@@ -23,14 +23,19 @@ const asString = (v) => v == null ? null : JSON.stringify(v);
 const upsertSettings = (ownerId, body) => __awaiter(void 0, void 0, void 0, function* () {
     const nutritionViewerIds = sanitizeIds(body === null || body === void 0 ? void 0 : body.nutritionViewerIds);
     const workoutViewerIds = sanitizeIds(body === null || body === void 0 ? void 0 : body.workoutViewerIds);
+    const goflowViewerIds = sanitizeIds(body === null || body === void 0 ? void 0 : body.goflowViewerIds);
     const data = {
         nutritionViewerIds,
         workoutViewerIds,
+        goflowViewerIds,
         nutritionSummary: nutritionViewerIds.length
             ? asString(body === null || body === void 0 ? void 0 : body.nutritionSummary)
             : null,
         workoutSummary: workoutViewerIds.length
             ? asString(body === null || body === void 0 ? void 0 : body.workoutSummary)
+            : null,
+        goflowSummary: goflowViewerIds.length
+            ? asString(body === null || body === void 0 ? void 0 : body.goflowSummary)
             : null,
     };
     yield prisma.sharingProfile.upsert({
@@ -42,7 +47,7 @@ const upsertSettings = (ownerId, body) => __awaiter(void 0, void 0, void 0, func
 });
 /** What [ownerId] shares with [viewerId] — only the granted sections. */
 const getSummaryFor = (viewerId, ownerId) => __awaiter(void 0, void 0, void 0, function* () {
-    const empty = { nutrition: null, workout: null };
+    const empty = { nutrition: null, workout: null, goflow: null };
     if (!ownerId || !OID.test(ownerId))
         return empty;
     const p = yield prisma.sharingProfile.findUnique({ where: { ownerId } });
@@ -64,6 +69,9 @@ const getSummaryFor = (viewerId, ownerId) => __awaiter(void 0, void 0, void 0, f
             : null,
         workout: p.workoutViewerIds.includes(viewerId)
             ? parse(p.workoutSummary)
+            : null,
+        goflow: (p.goflowViewerIds || []).includes(viewerId)
+            ? parse(p.goflowSummary)
             : null,
     };
 });

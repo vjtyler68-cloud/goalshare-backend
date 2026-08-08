@@ -8,9 +8,11 @@ model SharingProfile {
 
     nutritionViewerIds String[] @db.ObjectId
     workoutViewerIds   String[] @db.ObjectId
+    goflowViewerIds    String[] @db.ObjectId
 
     nutritionSummary String? // JSON blob, null when shared with nobody
     workoutSummary   String?
+    goflowSummary    String? // GoFlow: phase + optional status only, never logs
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

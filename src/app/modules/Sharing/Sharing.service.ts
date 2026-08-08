@@ -18,14 +18,19 @@ const asString = (v: unknown): string | null =>
 const upsertSettings = async (ownerId: string, body: any) => {
   const nutritionViewerIds = sanitizeIds(body?.nutritionViewerIds);
   const workoutViewerIds = sanitizeIds(body?.workoutViewerIds);
+  const goflowViewerIds = sanitizeIds(body?.goflowViewerIds);
   const data = {
     nutritionViewerIds,
     workoutViewerIds,
+    goflowViewerIds,
     nutritionSummary: nutritionViewerIds.length
       ? asString(body?.nutritionSummary)
       : null,
     workoutSummary: workoutViewerIds.length
       ? asString(body?.workoutSummary)
+      : null,
+    goflowSummary: goflowViewerIds.length
+      ? asString(body?.goflowSummary)
       : null,
   };
   await prisma.sharingProfile.upsert({
@@ -38,7 +43,11 @@ const upsertSettings = async (ownerId: string, body: any) => {
 
 /** What [ownerId] shares with [viewerId] — only the granted sections. */
 const getSummaryFor = async (viewerId: string, ownerId: string) => {
-  const empty = { nutrition: null as unknown, workout: null as unknown };
+  const empty = {
+    nutrition: null as unknown,
+    workout: null as unknown,
+    goflow: null as unknown,
+  };
   if (!ownerId || !OID.test(ownerId)) return empty;
   const p = await prisma.sharingProfile.findUnique({ where: { ownerId } });
   if (!p) return empty;
@@ -56,6 +65,9 @@ const getSummaryFor = async (viewerId: string, ownerId: string) => {
       : null,
     workout: p.workoutViewerIds.includes(viewerId)
       ? parse(p.workoutSummary)
+      : null,
+    goflow: (p.goflowViewerIds ?? []).includes(viewerId)
+      ? parse(p.goflowSummary)
       : null,
   };
 };
