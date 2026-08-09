@@ -16,6 +16,39 @@ model Organization {
     @@map("organization")
 }
 
+// A post inside an org's private Team HQ. kind='announcement' (admin-only) or
+// kind='feed' (any member). Only members of the org ever see these.
+model OrgPost {
+    id           String   @id @default(auto()) @map("_id") @db.ObjectId
+    orgId        String   @db.ObjectId
+    authorId     String   @db.ObjectId
+    authorName   String   @default("")
+    authorAvatar String   @default("")
+    kind         String // 'announcement' | 'feed'
+    text         String
+    likes        String[] @db.ObjectId // userIds who reacted
+
+    createdAt DateTime @default(now())
+
+    @@map("orgpost")
+}
+
+// A shared team goal/target. Metric goals auto-sum from members' reported
+// numbers (metricKey, e.g. 'leads.count'); 'manual' goals use manualProgress.
+model OrgGoal {
+    id             String @id @default(auto()) @map("_id") @db.ObjectId
+    orgId          String @db.ObjectId
+    title          String
+    target         Int    @default(0)
+    metricKey      String @default("manual") // 'leads.count' | 'rpm.goal_completed' | 'manual'
+    manualProgress Int    @default(0)
+    createdBy      String @db.ObjectId
+
+    createdAt DateTime @default(now())
+
+    @@map("orggoal")
+}
+
 model OrgMembership {
     id     String  @id @default(auto()) @map("_id") @db.ObjectId
     orgId  String  @db.ObjectId

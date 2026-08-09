@@ -11,4 +11,13 @@ router.get('/:id/roster', auth('ANY'), OrgControllers.getRoster);
 router.post('/summary', auth('ANY'), OrgControllers.pushSummary);
 router.post('/leave', auth('ANY'), OrgControllers.leaveOrg);
 
+// Team HQ (org-private) — all membership-enforced in the service layer.
+router.get('/:id/space', auth('ANY'), OrgControllers.getSpace);
+router.post('/:id/post', auth('ANY'), OrgControllers.createPost);
+router.post('/post/:postId/like', auth('ANY'), OrgControllers.toggleLike);
+router.delete('/post/:postId', auth('ANY'), OrgControllers.deletePost);
+router.post('/:id/goal', auth('ANY'), OrgControllers.createGoal);
+router.post('/goal/:goalId/bump', auth('ANY'), OrgControllers.bumpGoal);
+router.delete('/goal/:goalId', auth('ANY'), OrgControllers.deleteGoal);
+
 export const OrgRoutes = router;

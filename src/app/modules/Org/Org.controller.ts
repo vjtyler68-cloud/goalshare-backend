@@ -64,6 +64,88 @@ const leaveOrg = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getSpace = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.getSpace(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Team HQ',
+    data: result,
+  });
+});
+
+const createPost = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.createPost(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Posted',
+    data: result,
+  });
+});
+
+const toggleLike = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.toggleLike(req.user.id, req.params.postId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Updated',
+    data: result,
+  });
+});
+
+const deletePost = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.deletePost(req.user.id, req.params.postId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Deleted',
+    data: result,
+  });
+});
+
+const createGoal = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.createGoal(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Goal created',
+    data: result,
+  });
+});
+
+const bumpGoal = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.bumpGoal(
+    req.user.id,
+    req.params.goalId,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Goal updated',
+    data: result,
+  });
+});
+
+const deleteGoal = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.deleteGoal(req.user.id, req.params.goalId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Goal deleted',
+    data: result,
+  });
+});
+
 export const OrgControllers = {
   createOrg,
   joinOrg,
@@ -71,4 +153,11 @@ export const OrgControllers = {
   getRoster,
   pushSummary,
   leaveOrg,
+  getSpace,
+  createPost,
+  toggleLike,
+  deletePost,
+  createGoal,
+  bumpGoal,
+  deleteGoal,
 };

@@ -178,6 +178,182 @@ const leaveOrg = async (userId: string) => {
   return { ok: true };
 };
 
+// ── Team HQ (org-private posts + goals) ───────────────────────────────────────
+// Every read/write is gated on an active membership in that org, so content
+// never leaks to other orgs or the public.
+
+const membershipIn = (userId: string, orgId: string) =>
+  prisma.orgMembership.findFirst({ where: { orgId, userId, active: true } });
+
+const assertMember = async (userId: string, orgId: string) => {
+  if (!orgId || !OID.test(orgId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad org id.');
+  }
+  const m = await membershipIn(userId, orgId);
+  if (!m) throw new AppError(httpStatus.FORBIDDEN, 'Not a member of this org.');
+  return m;
+};
+
+const shapePost = (p: any, userId: string) => ({
+  id: p.id,
+  kind: p.kind,
+  text: p.text,
+  authorId: p.authorId,
+  authorName: p.authorName,
+  authorAvatar: p.authorAvatar,
+  likeCount: (p.likes ?? []).length,
+  likedByMe: (p.likes ?? []).includes(userId),
+  createdAt: p.createdAt,
+});
+
+/** The org's Team HQ: announcements, feed, and goals (with computed progress).
+ *  Members only. */
+const getSpace = async (userId: string, orgId: string) => {
+  await assertMember(userId, orgId);
+
+  const posts = await prisma.orgPost.findMany({
+    where: { orgId },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+  const goals = await prisma.orgGoal.findMany({
+    where: { orgId },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Metric-goal progress = sum of members' reported numbers for that key.
+  const memberships = await prisma.orgMembership.findMany({
+    where: { orgId, active: true },
+  });
+  const sumMetric = (key: string) => {
+    let total = 0;
+    for (const m of memberships) {
+      if (!m.summaryJson) continue;
+      try {
+        const s = JSON.parse(m.summaryJson);
+        const v = s?.[key];
+        if (typeof v === 'number') total += v;
+      } catch {
+        /* ignore */
+      }
+    }
+    return total;
+  };
+
+  const announcements = posts
+    .filter(p => p.kind === 'announcement')
+    .map(p => shapePost(p, userId));
+  const feed = posts
+    .filter(p => p.kind === 'feed')
+    .map(p => shapePost(p, userId));
+  const shapedGoals = goals.map(g => ({
+    id: g.id,
+    title: g.title,
+    target: g.target,
+    metricKey: g.metricKey,
+    progress: g.metricKey === 'manual' ? g.manualProgress : sumMetric(g.metricKey),
+  }));
+
+  return { announcements, feed, goals: shapedGoals };
+};
+
+/** Create a post. Announcements require admin; feed posts are open to members. */
+const createPost = async (userId: string, orgId: string, body: any) => {
+  const m = await assertMember(userId, orgId);
+  const kind = (body?.kind ?? 'feed').toString() === 'announcement'
+    ? 'announcement'
+    : 'feed';
+  if (kind === 'announcement' && m.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Only admins can post announcements.');
+  }
+  const text = (body?.text ?? '').toString().trim();
+  if (!text) throw new AppError(httpStatus.BAD_REQUEST, 'Post cannot be empty.');
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { fullName: true, profile: true },
+  });
+  const post = await prisma.orgPost.create({
+    data: {
+      orgId,
+      authorId: userId,
+      authorName: me?.fullName || 'Member',
+      authorAvatar: me?.profile || '',
+      kind,
+      text: text.slice(0, 1000),
+    },
+  });
+  return shapePost(post, userId);
+};
+
+const toggleLike = async (userId: string, postId: string) => {
+  if (!postId || !OID.test(postId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad post id.');
+  }
+  const post = await prisma.orgPost.findUnique({ where: { id: postId } });
+  if (!post) throw new AppError(httpStatus.NOT_FOUND, 'Post not found.');
+  await assertMember(userId, post.orgId);
+  const likes = post.likes ?? [];
+  const has = likes.includes(userId);
+  const updated = await prisma.orgPost.update({
+    where: { id: postId },
+    data: {
+      likes: has
+        ? { set: likes.filter(x => x !== userId) }
+        : { push: userId },
+    },
+  });
+  return shapePost(updated, userId);
+};
+
+const deletePost = async (userId: string, postId: string) => {
+  if (!postId || !OID.test(postId)) return { ok: true };
+  const post = await prisma.orgPost.findUnique({ where: { id: postId } });
+  if (!post) return { ok: true };
+  const m = await membershipIn(userId, post.orgId);
+  const canDelete = post.authorId === userId || m?.role === 'admin';
+  if (!canDelete) throw new AppError(httpStatus.FORBIDDEN, 'Not allowed.');
+  await prisma.orgPost.delete({ where: { id: postId } });
+  return { ok: true };
+};
+
+const createGoal = async (userId: string, orgId: string, body: any) => {
+  const m = await assertMember(userId, orgId);
+  if (m.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Only admins set team goals.');
+  }
+  const title = (body?.title ?? '').toString().trim();
+  if (!title) throw new AppError(httpStatus.BAD_REQUEST, 'Goal needs a title.');
+  const target = Number.isFinite(body?.target) ? Math.max(0, Math.round(body.target)) : 0;
+  const metricKey = (body?.metricKey ?? 'manual').toString();
+  return prisma.orgGoal.create({
+    data: { orgId, title: title.slice(0, 120), target, metricKey, createdBy: userId },
+  });
+};
+
+const bumpGoal = async (userId: string, goalId: string, body: any) => {
+  if (!goalId || !OID.test(goalId)) throw new AppError(httpStatus.BAD_REQUEST, 'Bad id.');
+  const goal = await prisma.orgGoal.findUnique({ where: { id: goalId } });
+  if (!goal) throw new AppError(httpStatus.NOT_FOUND, 'Goal not found.');
+  const m = await membershipIn(userId, goal.orgId);
+  if (m?.role !== 'admin') throw new AppError(httpStatus.FORBIDDEN, 'Admins only.');
+  const delta = Number.isFinite(body?.delta) ? Math.round(body.delta) : 0;
+  const next = Math.max(0, goal.manualProgress + delta);
+  return prisma.orgGoal.update({
+    where: { id: goalId },
+    data: { manualProgress: next },
+  });
+};
+
+const deleteGoal = async (userId: string, goalId: string) => {
+  if (!goalId || !OID.test(goalId)) return { ok: true };
+  const goal = await prisma.orgGoal.findUnique({ where: { id: goalId } });
+  if (!goal) return { ok: true };
+  const m = await membershipIn(userId, goal.orgId);
+  if (m?.role !== 'admin') throw new AppError(httpStatus.FORBIDDEN, 'Admins only.');
+  await prisma.orgGoal.delete({ where: { id: goalId } });
+  return { ok: true };
+};
+
 export const OrgServices = {
   createOrg,
   joinOrg,
@@ -185,4 +361,11 @@ export const OrgServices = {
   getRoster,
   pushSummary,
   leaveOrg,
+  getSpace,
+  createPost,
+  toggleLike,
+  deletePost,
+  createGoal,
+  bumpGoal,
+  deleteGoal,
 };
