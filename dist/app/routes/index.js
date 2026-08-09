@@ -24,6 +24,7 @@ const Push_routes_1 = require("../modules/Push/Push.routes");
 const Accountability_routes_1 = require("../modules/Accountability/Accountability.routes");
 const Sharing_routes_1 = require("../modules/Sharing/Sharing.routes");
 const Circles_routes_1 = require("../modules/Circles/Circles.routes");
+const Org_routes_1 = require("../modules/Org/Org.routes");
 const router = express_1.default.Router();
 const moduleRoutes = [
     {
@@ -105,6 +106,10 @@ const moduleRoutes = [
     {
         path: '/circles',
         route: Circles_routes_1.CirclesRoutes,
+    },
+    {
+        path: '/org',
+        route: Org_routes_1.OrgRoutes,
     },
 ];
 moduleRoutes.forEach(route => router.use(route.path, route.route));

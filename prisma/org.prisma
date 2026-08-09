@@ -1,0 +1,29 @@
+// Organizations — a School / Sales / Gym org with one admin (trainer for gym)
+// and members (trainees). Cross-device via the backend so an admin can see
+// their roster. Field-level visibility is enforced app-side by a hardcoded
+// whitelist; this layer just holds orgs + memberships.
+model Organization {
+    id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+    name               String
+    orgType            String // 'school' | 'salesOrg' | 'gym'
+    inviteCode         String   @unique
+    adminUserId        String   @db.ObjectId
+    additionalAdminIds String[] @db.ObjectId
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("organization")
+}
+
+model OrgMembership {
+    id     String  @id @default(auto()) @map("_id") @db.ObjectId
+    orgId  String  @db.ObjectId
+    userId String  @db.ObjectId
+    role   String // 'admin' | 'member'
+    active Boolean @default(true) // soft-delete: false once a user leaves
+
+    joinedAt DateTime @default(now())
+
+    @@map("orgmembership")
+}
