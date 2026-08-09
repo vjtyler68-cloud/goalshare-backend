@@ -122,18 +122,49 @@ const getRoster = async (userId: string, orgId: string) => {
     {};
   for (const u of users) byId[u.id] = u;
 
+  const parse = (s: string | null) => {
+    if (!s) return null;
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
+  };
   const members = memberships.map(m => ({
     userId: m.userId,
     name: byId[m.userId]?.fullName || 'Member',
     avatar: byId[m.userId]?.profile || '',
     role: m.role,
     joinedAt: m.joinedAt,
+    summary: parse(m.summaryJson),
+    summaryAt: m.summaryAt,
   }));
   return {
     org: org ? shapeOrg(org, mine.role) : null,
     members,
     memberCount: members.length,
   };
+};
+
+/** Store the current user's whitelist-scoped engagement summary (a JSON map the
+ *  app already scoped to the org type). Best-effort — a bad payload is ignored. */
+const pushSummary = async (userId: string, body: any) => {
+  const m = await myActiveMembership(userId);
+  if (!m) return { ok: false };
+  let summaryJson: string | null = null;
+  const summary = body?.summary;
+  if (summary && typeof summary === 'object') {
+    try {
+      summaryJson = JSON.stringify(summary);
+    } catch {
+      summaryJson = null;
+    }
+  }
+  await prisma.orgMembership.update({
+    where: { id: m.id },
+    data: { summaryJson, summaryAt: new Date() },
+  });
+  return { ok: true };
 };
 
 /** Leave the current org — soft-delete the membership (kept for records). */
@@ -152,5 +183,6 @@ export const OrgServices = {
   joinOrg,
   getMine,
   getRoster,
+  pushSummary,
   leaveOrg,
 };

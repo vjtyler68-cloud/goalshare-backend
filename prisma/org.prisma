@@ -23,6 +23,11 @@ model OrgMembership {
     role   String // 'admin' | 'member'
     active Boolean @default(true) // soft-delete: false once a user leaves
 
+    // Member-pushed, whitelist-scoped engagement summary (JSON string). Only the
+    // fields allowed for this org type ever land here — never raw logs.
+    summaryJson String?
+    summaryAt   DateTime?
+
     joinedAt DateTime @default(now())
 
     @@map("orgmembership")

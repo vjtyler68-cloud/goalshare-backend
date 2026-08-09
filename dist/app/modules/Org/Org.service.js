@@ -124,6 +124,16 @@ const getRoster = (userId, orgId) => __awaiter(void 0, void 0, void 0, function*
     const byId = {};
     for (const u of users)
         byId[u.id] = u;
+    const parse = (s) => {
+        if (!s)
+            return null;
+        try {
+            return JSON.parse(s);
+        }
+        catch (_a) {
+            return null;
+        }
+    };
     const members = memberships.map(m => {
         var _a, _b;
         return ({
@@ -132,6 +142,8 @@ const getRoster = (userId, orgId) => __awaiter(void 0, void 0, void 0, function*
             avatar: ((_b = byId[m.userId]) === null || _b === void 0 ? void 0 : _b.profile) || '',
             role: m.role,
             joinedAt: m.joinedAt,
+            summary: parse(m.summaryJson),
+            summaryAt: m.summaryAt,
         });
     });
     return {
@@ -139,6 +151,28 @@ const getRoster = (userId, orgId) => __awaiter(void 0, void 0, void 0, function*
         members,
         memberCount: members.length,
     };
+});
+/** Store the current user's whitelist-scoped engagement summary (a JSON map the
+ *  app already scoped to the org type). Best-effort — a bad payload is ignored. */
+const pushSummary = (userId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    const m = yield myActiveMembership(userId);
+    if (!m)
+        return { ok: false };
+    let summaryJson = null;
+    const summary = body === null || body === void 0 ? void 0 : body.summary;
+    if (summary && typeof summary === 'object') {
+        try {
+            summaryJson = JSON.stringify(summary);
+        }
+        catch (_a) {
+            summaryJson = null;
+        }
+    }
+    yield prisma.orgMembership.update({
+        where: { id: m.id },
+        data: { summaryJson, summaryAt: new Date() },
+    });
+    return { ok: true };
 });
 /** Leave the current org — soft-delete the membership (kept for records). */
 const leaveOrg = (userId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -156,5 +190,6 @@ exports.OrgServices = {
     joinOrg,
     getMine,
     getRoster,
+    pushSummary,
     leaveOrg,
 };
