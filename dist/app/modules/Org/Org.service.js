@@ -102,7 +102,7 @@ const joinOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* ()
     return { org, role: 'member' };
 });
 const shapeOrg = (org, role) => {
-    var _a, _b;
+    var _a, _b, _c, _d;
     return ({
         id: org.id,
         name: org.name,
@@ -111,6 +111,8 @@ const shapeOrg = (org, role) => {
         adminUserId: org.adminUserId,
         mapUrl: (_a = org.mapUrl) !== null && _a !== void 0 ? _a : null,
         mapLabel: (_b = org.mapLabel) !== null && _b !== void 0 ? _b : null,
+        bookingUrl: (_c = org.bookingUrl) !== null && _c !== void 0 ? _c : null,
+        bookingLabel: (_d = org.bookingLabel) !== null && _d !== void 0 ? _d : null,
         role,
         isAdmin: role === 'admin',
     });
@@ -261,6 +263,36 @@ const setMap = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, functi
     const org = yield prisma.organization.update({
         where: { id: orgId },
         data: { mapUrl, mapLabel },
+    });
+    return { org: shapeOrg(org, mine.role) };
+});
+/** Set (or clear) the org's appointment scheduler (a booking widget URL). Admin
+ *  only. An empty bookingUrl removes it. Must be an http(s) link. */
+const setBooking = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    if (!orgId || !OID.test(orgId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad org id.');
+    }
+    const mine = yield prisma.orgMembership.findFirst({
+        where: { orgId, userId, active: true },
+    });
+    if (!mine || mine.role !== 'admin') {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Admins only.');
+    }
+    const raw = ((_a = body === null || body === void 0 ? void 0 : body.bookingUrl) !== null && _a !== void 0 ? _a : '').toString().trim();
+    let bookingUrl = null;
+    if (raw) {
+        // A booking widget is loaded in a web view, so require http(s).
+        if (!/^https?:\/\//i.test(raw)) {
+            throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Enter a valid scheduler link (it should start with https://).');
+        }
+        bookingUrl = raw.slice(0, 2000);
+    }
+    const label = ((_b = body === null || body === void 0 ? void 0 : body.bookingLabel) !== null && _b !== void 0 ? _b : '').toString().trim();
+    const bookingLabel = label ? label.slice(0, 60) : null;
+    const org = yield prisma.organization.update({
+        where: { id: orgId },
+        data: { bookingUrl, bookingLabel },
     });
     return { org: shapeOrg(org, mine.role) };
 });
@@ -455,6 +487,7 @@ exports.OrgServices = {
     pushSummary,
     leaveOrg,
     setMap,
+    setBooking,
     getSpace,
     createPost,
     toggleLike,

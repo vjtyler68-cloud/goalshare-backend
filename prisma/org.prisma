@@ -16,6 +16,12 @@ model Organization {
     mapUrl   String?
     mapLabel String?
 
+    // Optional per-org appointment scheduler — a booking widget URL (e.g. a
+    // LeadConnector/GoHighLevel booking link) opened in-app. Same per-org scoping
+    // as the map: only members of an org that has one see the scheduler.
+    bookingUrl   String?
+    bookingLabel String?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 

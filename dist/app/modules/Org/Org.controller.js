@@ -94,6 +94,16 @@ const setMap = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0,
         data: result,
     });
 }));
+const setBooking = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Org_service_1.OrgServices.setBooking(req.user.id, req.params.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Scheduler saved',
+        data: result,
+    });
+}));
 const getSpace = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield Org_service_1.OrgServices.getSpace(req.user.id, req.params.id);
     (0, sendResponse_1.default)(res, {
@@ -169,6 +179,7 @@ exports.OrgControllers = {
     pushSummary,
     leaveOrg,
     setMap,
+    setBooking,
     getSpace,
     createPost,
     toggleLike,

@@ -88,6 +88,20 @@ const setMap = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const setBooking = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.setBooking(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Scheduler saved',
+    data: result,
+  });
+});
+
 const getSpace = catchAsync(async (req: Request, res: Response) => {
   const result = await OrgServices.getSpace(req.user.id, req.params.id);
   sendResponse(res, {
@@ -179,6 +193,7 @@ export const OrgControllers = {
   pushSummary,
   leaveOrg,
   setMap,
+  setBooking,
   getSpace,
   createPost,
   toggleLike,

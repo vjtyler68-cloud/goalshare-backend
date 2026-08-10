@@ -108,6 +108,8 @@ const shapeOrg = (org: any, role: string) => ({
   adminUserId: org.adminUserId,
   mapUrl: org.mapUrl ?? null,
   mapLabel: org.mapLabel ?? null,
+  bookingUrl: org.bookingUrl ?? null,
+  bookingLabel: org.bookingLabel ?? null,
   role,
   isAdmin: role === 'admin',
 });
@@ -254,6 +256,39 @@ const setMap = async (userId: string, orgId: string, body: any) => {
   const org = await prisma.organization.update({
     where: { id: orgId },
     data: { mapUrl, mapLabel },
+  });
+  return { org: shapeOrg(org, mine.role) };
+};
+
+/** Set (or clear) the org's appointment scheduler (a booking widget URL). Admin
+ *  only. An empty bookingUrl removes it. Must be an http(s) link. */
+const setBooking = async (userId: string, orgId: string, body: any) => {
+  if (!orgId || !OID.test(orgId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad org id.');
+  }
+  const mine = await prisma.orgMembership.findFirst({
+    where: { orgId, userId, active: true },
+  });
+  if (!mine || mine.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Admins only.');
+  }
+  const raw = (body?.bookingUrl ?? '').toString().trim();
+  let bookingUrl: string | null = null;
+  if (raw) {
+    // A booking widget is loaded in a web view, so require http(s).
+    if (!/^https?:\/\//i.test(raw)) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        'Enter a valid scheduler link (it should start with https://).',
+      );
+    }
+    bookingUrl = raw.slice(0, 2000);
+  }
+  const label = (body?.bookingLabel ?? '').toString().trim();
+  const bookingLabel = label ? label.slice(0, 60) : null;
+  const org = await prisma.organization.update({
+    where: { id: orgId },
+    data: { bookingUrl, bookingLabel },
   });
   return { org: shapeOrg(org, mine.role) };
 };
@@ -443,6 +478,7 @@ export const OrgServices = {
   pushSummary,
   leaveOrg,
   setMap,
+  setBooking,
   getSpace,
   createPost,
   toggleLike,
