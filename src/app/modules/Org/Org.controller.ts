@@ -34,6 +34,16 @@ const getMine = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getMyOrgs = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.getMyOrgs(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'My organizations',
+    data: result,
+  });
+});
+
 const getRoster = catchAsync(async (req: Request, res: Response) => {
   const result = await OrgServices.getRoster(req.user.id, req.params.id);
   sendResponse(res, {
@@ -55,7 +65,7 @@ const pushSummary = catchAsync(async (req: Request, res: Response) => {
 });
 
 const leaveOrg = catchAsync(async (req: Request, res: Response) => {
-  const result = await OrgServices.leaveOrg(req.user.id);
+  const result = await OrgServices.leaveOrg(req.user.id, req.body ?? {});
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -150,6 +160,7 @@ export const OrgControllers = {
   createOrg,
   joinOrg,
   getMine,
+  getMyOrgs,
   getRoster,
   pushSummary,
   leaveOrg,

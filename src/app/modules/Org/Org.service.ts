@@ -7,6 +7,21 @@ const prisma = new PrismaClient();
 const OID = /^[a-f0-9]{24}$/i;
 const VALID_TYPES = ['school', 'salesOrg', 'gym'];
 
+// Owner accounts may belong to MULTIPLE orgs (everyone else is one-org).
+// Configurable via OWNER_EMAILS (comma-separated); defaults to the app owner.
+const OWNER_EMAILS = (process.env.OWNER_EMAILS || 'vjtyler68@gmail.com')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
+
+const isOwner = async (userId: string): Promise<boolean> => {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+  return !!u && OWNER_EMAILS.includes((u.email || '').toLowerCase());
+};
+
 // Unambiguous alphabet (no 0/O/1/I) for a human-shareable 6-char code.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const genCode = () => {
@@ -23,7 +38,7 @@ const myActiveMembership = (userId: string) =>
 /** Create an org — the creator becomes its admin. One active org per user. */
 const createOrg = async (userId: string, body: any) => {
   const existing = await myActiveMembership(userId);
-  if (existing) {
+  if (existing && !(await isOwner(userId))) {
     throw new AppError(
       httpStatus.CONFLICT,
       'You are already in an organization. Leave it first.',
@@ -56,7 +71,7 @@ const createOrg = async (userId: string, body: any) => {
 /** Join an org by invite code — the joiner becomes a member. */
 const joinOrg = async (userId: string, body: any) => {
   const existing = await myActiveMembership(userId);
-  if (existing) {
+  if (existing && !(await isOwner(userId))) {
     throw new AppError(
       httpStatus.CONFLICT,
       'You are already in an organization. Leave it first.',
@@ -71,6 +86,13 @@ const joinOrg = async (userId: string, body: any) => {
   });
   if (!org) {
     throw new AppError(httpStatus.NOT_FOUND, 'No organization with that code.');
+  }
+  // Even an owner can't join the same org twice.
+  const already = await prisma.orgMembership.findFirst({
+    where: { orgId: org.id, userId, active: true },
+  });
+  if (already) {
+    throw new AppError(httpStatus.CONFLICT, 'You are already in this org.');
   }
   await prisma.orgMembership.create({
     data: { orgId: org.id, userId, role: 'member' },
@@ -90,11 +112,27 @@ const shapeOrg = (org: any, role: string) => ({
 
 /** The current user's active org + their role, or null. */
 const getMine = async (userId: string) => {
+  const owner = await isOwner(userId);
   const m = await myActiveMembership(userId);
-  if (!m) return { org: null };
+  if (!m) return { org: null, isOwner: owner };
   const org = await prisma.organization.findUnique({ where: { id: m.orgId } });
-  if (!org) return { org: null };
-  return { org: shapeOrg(org, m.role) };
+  if (!org) return { org: null, isOwner: owner };
+  return { org: shapeOrg(org, m.role), isOwner: owner };
+};
+
+/** ALL of the user's active orgs (owners can have several) + the owner flag. */
+const getMyOrgs = async (userId: string) => {
+  const owner = await isOwner(userId);
+  const memberships = await prisma.orgMembership.findMany({
+    where: { userId, active: true },
+    orderBy: { joinedAt: 'asc' },
+  });
+  const orgs: any[] = [];
+  for (const m of memberships) {
+    const org = await prisma.organization.findUnique({ where: { id: m.orgId } });
+    if (org) orgs.push(shapeOrg(org, m.role));
+  }
+  return { orgs, isOwner: owner };
 };
 
 /** Roster for [orgId] — admin only. Members with name/avatar/joined/role. */
@@ -167,9 +205,16 @@ const pushSummary = async (userId: string, body: any) => {
   return { ok: true };
 };
 
-/** Leave the current org — soft-delete the membership (kept for records). */
-const leaveOrg = async (userId: string) => {
-  const m = await myActiveMembership(userId);
+/** Leave an org — soft-delete the membership (kept for records). With a
+ *  specific orgId (owners have several) leaves that one; otherwise the active
+ *  membership. */
+const leaveOrg = async (userId: string, body: any) => {
+  const orgId = (body?.orgId ?? '').toString();
+  const m = orgId && OID.test(orgId)
+    ? await prisma.orgMembership.findFirst({
+        where: { orgId, userId, active: true },
+      })
+    : await myActiveMembership(userId);
   if (!m) return { ok: true };
   await prisma.orgMembership.update({
     where: { id: m.id },
@@ -358,6 +403,7 @@ export const OrgServices = {
   createOrg,
   joinOrg,
   getMine,
+  getMyOrgs,
   getRoster,
   pushSummary,
   leaveOrg,

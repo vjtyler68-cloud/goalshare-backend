@@ -19,6 +19,19 @@ const AppError_1 = __importDefault(require("../../errors/AppError"));
 const prisma = new client_1.PrismaClient();
 const OID = /^[a-f0-9]{24}$/i;
 const VALID_TYPES = ['school', 'salesOrg', 'gym'];
+// Owner accounts may belong to MULTIPLE orgs (everyone else is one-org).
+// Configurable via OWNER_EMAILS (comma-separated); defaults to the app owner.
+const OWNER_EMAILS = (process.env.OWNER_EMAILS || 'vjtyler68@gmail.com')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+const isOwner = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const u = yield prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+    });
+    return !!u && OWNER_EMAILS.includes((u.email || '').toLowerCase());
+});
 // Unambiguous alphabet (no 0/O/1/I) for a human-shareable 6-char code.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const genCode = () => {
@@ -33,7 +46,7 @@ const myActiveMembership = (userId) => prisma.orgMembership.findFirst({ where: {
 const createOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const existing = yield myActiveMembership(userId);
-    if (existing) {
+    if (existing && !(yield isOwner(userId))) {
         throw new AppError_1.default(http_status_1.default.CONFLICT, 'You are already in an organization. Leave it first.');
     }
     const name = ((_a = body === null || body === void 0 ? void 0 : body.name) !== null && _a !== void 0 ? _a : '').toString().trim();
@@ -63,7 +76,7 @@ const createOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* 
 const joinOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const existing = yield myActiveMembership(userId);
-    if (existing) {
+    if (existing && !(yield isOwner(userId))) {
         throw new AppError_1.default(http_status_1.default.CONFLICT, 'You are already in an organization. Leave it first.');
     }
     const code = ((_a = body === null || body === void 0 ? void 0 : body.inviteCode) !== null && _a !== void 0 ? _a : '').toString().trim().toUpperCase();
@@ -75,6 +88,13 @@ const joinOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* ()
     });
     if (!org) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'No organization with that code.');
+    }
+    // Even an owner can't join the same org twice.
+    const already = yield prisma.orgMembership.findFirst({
+        where: { orgId: org.id, userId, active: true },
+    });
+    if (already) {
+        throw new AppError_1.default(http_status_1.default.CONFLICT, 'You are already in this org.');
     }
     yield prisma.orgMembership.create({
         data: { orgId: org.id, userId, role: 'member' },
@@ -92,13 +112,29 @@ const shapeOrg = (org, role) => ({
 });
 /** The current user's active org + their role, or null. */
 const getMine = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const owner = yield isOwner(userId);
     const m = yield myActiveMembership(userId);
     if (!m)
-        return { org: null };
+        return { org: null, isOwner: owner };
     const org = yield prisma.organization.findUnique({ where: { id: m.orgId } });
     if (!org)
-        return { org: null };
-    return { org: shapeOrg(org, m.role) };
+        return { org: null, isOwner: owner };
+    return { org: shapeOrg(org, m.role), isOwner: owner };
+});
+/** ALL of the user's active orgs (owners can have several) + the owner flag. */
+const getMyOrgs = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const owner = yield isOwner(userId);
+    const memberships = yield prisma.orgMembership.findMany({
+        where: { userId, active: true },
+        orderBy: { joinedAt: 'asc' },
+    });
+    const orgs = [];
+    for (const m of memberships) {
+        const org = yield prisma.organization.findUnique({ where: { id: m.orgId } });
+        if (org)
+            orgs.push(shapeOrg(org, m.role));
+    }
+    return { orgs, isOwner: owner };
 });
 /** Roster for [orgId] — admin only. Members with name/avatar/joined/role. */
 const getRoster = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -174,9 +210,17 @@ const pushSummary = (userId, body) => __awaiter(void 0, void 0, void 0, function
     });
     return { ok: true };
 });
-/** Leave the current org — soft-delete the membership (kept for records). */
-const leaveOrg = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    const m = yield myActiveMembership(userId);
+/** Leave an org — soft-delete the membership (kept for records). With a
+ *  specific orgId (owners have several) leaves that one; otherwise the active
+ *  membership. */
+const leaveOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const orgId = ((_a = body === null || body === void 0 ? void 0 : body.orgId) !== null && _a !== void 0 ? _a : '').toString();
+    const m = orgId && OID.test(orgId)
+        ? yield prisma.orgMembership.findFirst({
+            where: { orgId, userId, active: true },
+        })
+        : yield myActiveMembership(userId);
     if (!m)
         return { ok: true };
     yield prisma.orgMembership.update({
@@ -371,6 +415,7 @@ exports.OrgServices = {
     createOrg,
     joinOrg,
     getMine,
+    getMyOrgs,
     getRoster,
     pushSummary,
     leaveOrg,
