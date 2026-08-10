@@ -106,6 +106,8 @@ const shapeOrg = (org: any, role: string) => ({
   orgType: org.orgType,
   inviteCode: org.inviteCode,
   adminUserId: org.adminUserId,
+  mapUrl: org.mapUrl ?? null,
+  mapLabel: org.mapLabel ?? null,
   role,
   isAdmin: role === 'admin',
 });
@@ -221,6 +223,39 @@ const leaveOrg = async (userId: string, body: any) => {
     data: { active: false },
   });
   return { ok: true };
+};
+
+/** Set (or clear) the org's Territory Map link. Admin only. An empty mapUrl
+ *  removes the map. The link must carry a URI scheme (https:// or an app link). */
+const setMap = async (userId: string, orgId: string, body: any) => {
+  if (!orgId || !OID.test(orgId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad org id.');
+  }
+  const mine = await prisma.orgMembership.findFirst({
+    where: { orgId, userId, active: true },
+  });
+  if (!mine || mine.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Admins only.');
+  }
+  const raw = (body?.mapUrl ?? '').toString().trim();
+  let mapUrl: string | null = null;
+  if (raw) {
+    // Require a scheme (https://…, or an app deep link like fieldmaps://…).
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        'Enter a valid map link (it should start with https:// or an app link).',
+      );
+    }
+    mapUrl = raw.slice(0, 2000);
+  }
+  const label = (body?.mapLabel ?? '').toString().trim();
+  const mapLabel = label ? label.slice(0, 60) : null;
+  const org = await prisma.organization.update({
+    where: { id: orgId },
+    data: { mapUrl, mapLabel },
+  });
+  return { org: shapeOrg(org, mine.role) };
 };
 
 // ── Team HQ (org-private posts + goals) ───────────────────────────────────────
@@ -407,6 +442,7 @@ export const OrgServices = {
   getRoster,
   pushSummary,
   leaveOrg,
+  setMap,
   getSpace,
   createPost,
   toggleLike,

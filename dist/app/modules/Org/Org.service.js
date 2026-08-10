@@ -101,15 +101,20 @@ const joinOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* ()
     });
     return { org, role: 'member' };
 });
-const shapeOrg = (org, role) => ({
-    id: org.id,
-    name: org.name,
-    orgType: org.orgType,
-    inviteCode: org.inviteCode,
-    adminUserId: org.adminUserId,
-    role,
-    isAdmin: role === 'admin',
-});
+const shapeOrg = (org, role) => {
+    var _a, _b;
+    return ({
+        id: org.id,
+        name: org.name,
+        orgType: org.orgType,
+        inviteCode: org.inviteCode,
+        adminUserId: org.adminUserId,
+        mapUrl: (_a = org.mapUrl) !== null && _a !== void 0 ? _a : null,
+        mapLabel: (_b = org.mapLabel) !== null && _b !== void 0 ? _b : null,
+        role,
+        isAdmin: role === 'admin',
+    });
+};
 /** The current user's active org + their role, or null. */
 const getMine = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     const owner = yield isOwner(userId);
@@ -228,6 +233,36 @@ const leaveOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* (
         data: { active: false },
     });
     return { ok: true };
+});
+/** Set (or clear) the org's Territory Map link. Admin only. An empty mapUrl
+ *  removes the map. The link must carry a URI scheme (https:// or an app link). */
+const setMap = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    if (!orgId || !OID.test(orgId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad org id.');
+    }
+    const mine = yield prisma.orgMembership.findFirst({
+        where: { orgId, userId, active: true },
+    });
+    if (!mine || mine.role !== 'admin') {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Admins only.');
+    }
+    const raw = ((_a = body === null || body === void 0 ? void 0 : body.mapUrl) !== null && _a !== void 0 ? _a : '').toString().trim();
+    let mapUrl = null;
+    if (raw) {
+        // Require a scheme (https://…, or an app deep link like fieldmaps://…).
+        if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) {
+            throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Enter a valid map link (it should start with https:// or an app link).');
+        }
+        mapUrl = raw.slice(0, 2000);
+    }
+    const label = ((_b = body === null || body === void 0 ? void 0 : body.mapLabel) !== null && _b !== void 0 ? _b : '').toString().trim();
+    const mapLabel = label ? label.slice(0, 60) : null;
+    const org = yield prisma.organization.update({
+        where: { id: orgId },
+        data: { mapUrl, mapLabel },
+    });
+    return { org: shapeOrg(org, mine.role) };
 });
 // ── Team HQ (org-private posts + goals) ───────────────────────────────────────
 // Every read/write is gated on an active membership in that org, so content
@@ -419,6 +454,7 @@ exports.OrgServices = {
     getRoster,
     pushSummary,
     leaveOrg,
+    setMap,
     getSpace,
     createPost,
     toggleLike,

@@ -10,6 +10,12 @@ model Organization {
     adminUserId        String   @db.ObjectId
     additionalAdminIds String[] @db.ObjectId
 
+    // Optional per-org "Territory Map" (a data map grid) — e.g. an ArcGIS Field
+    // Maps deep link. Only members of an org that has one ever see it, so it can
+    // be scoped to a single org (Cowboys). Empty for every other org.
+    mapUrl   String?
+    mapLabel String?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 

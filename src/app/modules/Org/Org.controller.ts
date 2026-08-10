@@ -74,6 +74,20 @@ const leaveOrg = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const setMap = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.setMap(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Map saved',
+    data: result,
+  });
+});
+
 const getSpace = catchAsync(async (req: Request, res: Response) => {
   const result = await OrgServices.getSpace(req.user.id, req.params.id);
   sendResponse(res, {
@@ -164,6 +178,7 @@ export const OrgControllers = {
   getRoster,
   pushSummary,
   leaveOrg,
+  setMap,
   getSpace,
   createPost,
   toggleLike,

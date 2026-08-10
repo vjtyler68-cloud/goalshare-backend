@@ -11,6 +11,7 @@ router.get('/all', auth('ANY'), OrgControllers.getMyOrgs);
 router.get('/:id/roster', auth('ANY'), OrgControllers.getRoster);
 router.post('/summary', auth('ANY'), OrgControllers.pushSummary);
 router.post('/leave', auth('ANY'), OrgControllers.leaveOrg);
+router.post('/:id/map', auth('ANY'), OrgControllers.setMap); // admin — territory map
 
 // Team HQ (org-private) — all membership-enforced in the service layer.
 router.get('/:id/space', auth('ANY'), OrgControllers.getSpace);
