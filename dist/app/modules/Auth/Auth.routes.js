@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -8,12 +8,15 @@ const express_1 = __importDefault(require("express"));
 const validateRequest_1 = __importDefault(require("../../middlewares/validateRequest"));
 const auth_1 = __importDefault(require("../../middlewares/auth"));
 const client_1 = require("@prisma/client");
-const Auth_validation_1 = require("./auth.validation");
-const Auth_controller_1 = require("./auth.controller");
+const Auth_validation_1 = require("./Auth.validation");
+const Auth_controller_1 = require("./Auth.controller");
 const router = express_1.default.Router();
 router.post('/login', validateRequest_1.default.body(Auth_validation_1.authValidation.loginUser), Auth_controller_1.AuthControllers.loginWithOtp);
 router.post('/register', Auth_controller_1.AuthControllers.registerWithOtp);
 router.post('/logout', Auth_controller_1.AuthControllers.logoutUser);
+// Slide the session forward: re-issue a fresh token for a still-valid one, so
+// an active user is never unexpectedly logged out when their token nears expiry.
+router.post('/renew', (0, auth_1.default)(client_1.UserRoleEnum.USER, client_1.UserRoleEnum.ADMIN), Auth_controller_1.AuthControllers.renewToken);
 router.post('/firebase-login', Auth_controller_1.AuthControllers.firebaseLogin);
 router.post('/verify-email-with-otp', validateRequest_1.default.body(Auth_validation_1.authValidation.verifyOtpValidationSchema), Auth_controller_1.AuthControllers.verifyEmailWithOtp);
 router.post('/resend-verification-with-otp', validateRequest_1.default.body(Auth_validation_1.authValidation.forgetPasswordValidationSchema), Auth_controller_1.AuthControllers.resendVerificationWithOtp);

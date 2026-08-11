@@ -17,6 +17,13 @@ router.post(
 
 router.post('/register', AuthControllers.registerWithOtp);
 router.post('/logout', AuthControllers.logoutUser);
+// Slide the session forward: re-issue a fresh token for a still-valid one, so
+// an active user is never unexpectedly logged out when their token nears expiry.
+router.post(
+  '/renew',
+  auth(UserRoleEnum.USER, UserRoleEnum.ADMIN),
+  AuthControllers.renewToken,
+);
 router.post('/firebase-login', AuthControllers.firebaseLogin);
 
 router.post(

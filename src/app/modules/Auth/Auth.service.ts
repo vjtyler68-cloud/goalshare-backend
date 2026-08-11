@@ -568,8 +568,42 @@ const resetPassword = async (payload: { password: string; email: string }) => {
   return { message: 'Password reset successfully' };
 };
 
+/**
+ * Issue a fresh access token for an already-authenticated user. Called by the
+ * app to slide the session forward before the current token expires, so an
+ * active user is never unexpectedly logged out. The auth middleware has already
+ * verified the (still-valid) incoming token, so this just re-mints one.
+ */
+const renewToken = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      role: true,
+      isDeleted: true,
+    },
+  });
+  if (!user || user.isDeleted) {
+    throw new AppError(httpStatus.UNAUTHORIZED, 'Account not found.');
+  }
+  const accessToken = await generateToken(
+    {
+      id: user.id,
+      name: user.fullName,
+      email: user.email,
+      role: user.role,
+    },
+    config.jwt.access_secret as Secret,
+    config.jwt.access_expires_in as SignOptions['expiresIn'],
+  );
+  return { accessToken };
+};
+
 export const AuthServices = {
   loginWithOtpFromDB,
+  renewToken,
   registerWithOtpIntoDB,
   verifyEmailWithOtp,
   resendVerificationWithOtp,

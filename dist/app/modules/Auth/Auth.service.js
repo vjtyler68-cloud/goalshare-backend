@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -142,7 +142,8 @@ const loginWithOtpFromDB = (res, payload) => __awaiter(void 0, void 0, void 0, f
     }
     if (userData.role !== client_1.UserRoleEnum.ADMIN &&
         !userData.isEmailVerified &&
-        // Test mode: treat everyone as verified so testers log in directly.
+        // Test mode (AUTO_VERIFY_SIGNUPS=true): treat everyone as verified so
+        // testers can log in directly without any email round-trip.
         !(0, otp_1.isTestOtpMode)()) {
         const otp = Math.floor(100000 + Math.random() * 900000);
         yield prisma_1.prisma.user.update({
@@ -193,15 +194,16 @@ const registerWithOtpIntoDB = (payload) => __awaiter(void 0, void 0, void 0, fun
         throw new AppError_1.default(http_status_1.default.CONFLICT, 'User already exists');
     }
     // OTP generate (number) — static 123456 in test mode (AUTO_VERIFY_SIGNUPS).
-    const otp = (0, otp_1.isTestOtpMode)() ? 123456 : Math.floor(100000 + Math.random() * 900000);
-    // Test mode (AUTO_VERIFY_SIGNUPS): skip the email round-trip entirely.
-    // Free-access period (FREE_ACCESS_SIGNUPS or test mode): grant an active
-    // subscription so testers land past the paywall while IAP isn't live.
-    // REMOVE the env vars at public launch so real subscriptions apply.
-    const testSub = Object.assign(Object.assign({}, ((0, otp_1.isTestOtpMode)() ? { isEmailVerified: true } : {})), ((0, otp_1.isFreeAccessMode)()
-        ? { subscriptionStart: new Date(), subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'), hasUsedFree: true }
+    const otp = (0, otp_1.isTestOtpMode)()
+        ? 123456
+        : Math.floor(100000 + Math.random() * 900000);
+    const userData = Object.assign(Object.assign(Object.assign(Object.assign({}, payload), { password: hashedPassword, otp: otp.toString(), otpExpiry: (0, otp_1.otpExpiryTime)() }), ((0, otp_1.isTestOtpMode)() ? { isEmailVerified: true } : {})), ((0, otp_1.isFreeAccessMode)()
+        ? {
+            subscriptionStart: new Date(),
+            subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'),
+            hasUsedFree: true,
+        }
         : {}));
-    const userData = Object.assign(Object.assign(Object.assign({}, payload), { password: hashedPassword, otp: otp.toString(), otpExpiry: (0, otp_1.otpExpiryTime)() }), testSub);
     const newUser = yield prisma_1.prisma.user.create({
         data: userData,
         include: { subscription: true },
@@ -298,11 +300,12 @@ const verifyEmailWithOtp = (payload) => __awaiter(void 0, void 0, void 0, functi
         where: {
             email: userData.email,
         },
-        data: Object.assign({ otp: null, otpExpiry: null, isEmailVerified: true },
-        // Free-access period: users created before the flag existed may have no
-        // subscription — grant it on verify so they don't hit the paywall.
-        ((0, otp_1.isFreeAccessMode)() && !userData.subscriptionEnd
-            ? { subscriptionStart: new Date(), subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'), hasUsedFree: true }
+        data: Object.assign({ otp: null, otpExpiry: null, isEmailVerified: true }, ((0, otp_1.isFreeAccessMode)() && !userData.subscriptionEnd
+            ? {
+                subscriptionStart: new Date(),
+                subscriptionEnd: new Date('2030-12-31T00:00:00.000Z'),
+                hasUsedFree: true,
+            }
             : {})),
         select: {
             id: true,
@@ -405,7 +408,7 @@ const forgetPassword = (email) => __awaiter(void 0, void 0, void 0, function* ()
         const message = (0, otp_1.getOtpStatusMessage)(userData.otpExpiry);
         throw new AppError_1.default(http_status_1.default.CONFLICT, message);
     }
-    const otp = (0, otp_1.isTestOtpMode)() ? 123456 : Math.floor(100000 + Math.random() * 900000);
+    const otp = Math.floor(100000 + Math.random() * 900000);
     const expireTime = (0, otp_1.otpExpiryTime)();
     try {
         yield prisma_1.prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
@@ -484,8 +487,37 @@ const resetPassword = (payload) => __awaiter(void 0, void 0, void 0, function* (
     });
     return { message: 'Password reset successfully' };
 });
+/**
+ * Issue a fresh access token for an already-authenticated user. Called by the
+ * app to slide the session forward before the current token expires, so an
+ * active user is never unexpectedly logged out. The auth middleware has already
+ * verified the (still-valid) incoming token, so this just re-mints one.
+ */
+const renewToken = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield prisma_1.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+            id: true,
+            fullName: true,
+            email: true,
+            role: true,
+            isDeleted: true,
+        },
+    });
+    if (!user || user.isDeleted) {
+        throw new AppError_1.default(http_status_1.default.UNAUTHORIZED, 'Account not found.');
+    }
+    const accessToken = yield (0, generateToken_1.generateToken)({
+        id: user.id,
+        name: user.fullName,
+        email: user.email,
+        role: user.role,
+    }, config_1.default.jwt.access_secret, config_1.default.jwt.access_expires_in);
+    return { accessToken };
+});
 exports.AuthServices = {
     loginWithOtpFromDB,
+    renewToken,
     registerWithOtpIntoDB,
     verifyEmailWithOtp,
     resendVerificationWithOtp,

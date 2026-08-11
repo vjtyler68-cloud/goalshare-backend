@@ -116,8 +116,19 @@ const resetPassword = catchAsync(async (req, res) => {
   });
 });
 
+const renewToken = catchAsync(async (req, res) => {
+  const result = await AuthServices.renewToken(req.user.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Token renewed',
+    data: { accessToken: result.accessToken },
+  });
+});
+
 export const AuthControllers = {
   loginWithOtp,
+  renewToken,
   registerWithOtp,
   logoutUser,
   verifyEmailWithOtp,
