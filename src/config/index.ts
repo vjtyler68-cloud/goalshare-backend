@@ -19,7 +19,7 @@ export default {
   base_url_client: process.env.BASE_URL_CLIENT,
   jwt: {
     access_secret: process.env.JWT_ACCESS_SECRET,
-    access_expires_in: process.env.JWT_ACCESS_EXPIRES_IN,
+    access_expires_in: process.env.JWT_ACCESS_EXPIRES_IN || '90d',
     refresh_secret: process.env.JWT_REFRESH_SECRET,
     refresh_expires_in: process.env.JWT_REFRESH_EXPIRES_IN,
   },
