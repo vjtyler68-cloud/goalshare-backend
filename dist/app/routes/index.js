@@ -25,6 +25,7 @@ const Accountability_routes_1 = require("../modules/Accountability/Accountabilit
 const Sharing_routes_1 = require("../modules/Sharing/Sharing.routes");
 const Circles_routes_1 = require("../modules/Circles/Circles.routes");
 const Org_routes_1 = require("../modules/Org/Org.routes");
+const Canvass_routes_1 = require("../modules/Canvass/Canvass.routes");
 const router = express_1.default.Router();
 const moduleRoutes = [
     {
@@ -110,6 +111,10 @@ const moduleRoutes = [
     {
         path: '/org',
         route: Org_routes_1.OrgRoutes,
+    },
+    {
+        path: '/canvass',
+        route: Canvass_routes_1.CanvassRoutes,
     },
 ];
 moduleRoutes.forEach(route => router.use(route.path, route.route));

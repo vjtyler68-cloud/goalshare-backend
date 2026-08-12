@@ -20,6 +20,7 @@ import { AccountabilityRoutes } from '../modules/Accountability/Accountability.r
 import { SharingRoutes } from '../modules/Sharing/Sharing.routes';
 import { CirclesRoutes } from '../modules/Circles/Circles.routes';
 import { OrgRoutes } from '../modules/Org/Org.routes';
+import { CanvassRoutes } from '../modules/Canvass/Canvass.routes';
 
 const router = express.Router();
 
@@ -107,6 +108,10 @@ const moduleRoutes = [
   {
     path: '/org',
     route: OrgRoutes,
+  },
+  {
+    path: '/canvass',
+    route: CanvassRoutes,
   },
 ];
 

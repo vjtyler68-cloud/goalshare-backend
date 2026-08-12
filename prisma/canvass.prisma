@@ -1,0 +1,32 @@
+// Solar Cowboys canvassing — door-to-door pins for a sales org. Access is
+// enforced server-side by org membership (admin sees every pin in the org; a
+// rep sees only their own) — the same model the Org module already uses.
+model CanvassPin {
+    id       String @id @default(auto()) @map("_id") @db.ObjectId
+    orgId    String @db.ObjectId
+    repId    String @db.ObjectId
+    repName  String @default("")
+
+    lat Float
+    lng Float
+
+    address String @default("")
+    city    String @default("")
+    state   String @default("")
+    zip     String @default("")
+
+    status        String // status code (APPT, NH, SLR, SALE, …)
+    statusHistory String? // JSON: [{status, at, repId}]
+
+    homeownerName String?
+    notes         String?
+    phone         String?
+
+    visitCount  Int      @default(1)
+    lastVisited DateTime @default(now())
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("canvasspin")
+}
