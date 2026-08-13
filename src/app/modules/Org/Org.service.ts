@@ -469,6 +469,63 @@ const deleteGoal = async (userId: string, goalId: string) => {
   return { ok: true };
 };
 
+/** Promote a member to admin (co-admin) or demote an admin back to member.
+ *  Admin only. The org's FOUNDING admin (adminUserId) can never be demoted, so
+ *  an org always keeps at least one admin. Membership.role is the source of
+ *  truth; the org's additionalAdminIds array is kept in sync alongside it. */
+const setMemberRole = async (userId: string, orgId: string, body: any) => {
+  if (!orgId || !OID.test(orgId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad org id.');
+  }
+  const mine = await prisma.orgMembership.findFirst({
+    where: { orgId, userId, active: true },
+  });
+  if (!mine || mine.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Admins only.');
+  }
+  const targetId = (body?.userId ?? '').toString();
+  if (!targetId || !OID.test(targetId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad member id.');
+  }
+  const role = (body?.role ?? '').toString();
+  if (role !== 'admin' && role !== 'member') {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Role must be admin or member.');
+  }
+  const org = await prisma.organization.findUnique({ where: { id: orgId } });
+  if (!org) throw new AppError(httpStatus.NOT_FOUND, 'Org not found.');
+  // The founder is always an admin — blocking their demotion prevents an org
+  // from ever being left with no admin.
+  if (role === 'member' && targetId === org.adminUserId) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      'The organization owner always stays an admin.',
+    );
+  }
+  const target = await prisma.orgMembership.findFirst({
+    where: { orgId, userId: targetId, active: true },
+  });
+  if (!target) {
+    throw new AppError(httpStatus.NOT_FOUND, 'That member is not in this org.');
+  }
+
+  await prisma.orgMembership.update({
+    where: { id: target.id },
+    data: { role },
+  });
+  // Keep the org's co-admin list accurate for anything that reads it.
+  const set = new Set(org.additionalAdminIds ?? []);
+  if (role === 'admin') {
+    set.add(targetId);
+  } else {
+    set.delete(targetId);
+  }
+  await prisma.organization.update({
+    where: { id: orgId },
+    data: { additionalAdminIds: Array.from(set) },
+  });
+  return { ok: true, userId: targetId, role };
+};
+
 export const OrgServices = {
   createOrg,
   joinOrg,
@@ -486,4 +543,5 @@ export const OrgServices = {
   createGoal,
   bumpGoal,
   deleteGoal,
+  setMemberRole,
 };

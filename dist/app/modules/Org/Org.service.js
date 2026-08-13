@@ -478,6 +478,61 @@ const deleteGoal = (userId, goalId) => __awaiter(void 0, void 0, void 0, functio
     yield prisma.orgGoal.delete({ where: { id: goalId } });
     return { ok: true };
 });
+/** Promote a member to admin (co-admin) or demote an admin back to member.
+ *  Admin only. The org's FOUNDING admin (adminUserId) can never be demoted, so
+ *  an org always keeps at least one admin. Membership.role is the source of
+ *  truth; the org's additionalAdminIds array is kept in sync alongside it. */
+const setMemberRole = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    if (!orgId || !OID.test(orgId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad org id.');
+    }
+    const mine = yield prisma.orgMembership.findFirst({
+        where: { orgId, userId, active: true },
+    });
+    if (!mine || mine.role !== 'admin') {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Admins only.');
+    }
+    const targetId = ((_a = body === null || body === void 0 ? void 0 : body.userId) !== null && _a !== void 0 ? _a : '').toString();
+    if (!targetId || !OID.test(targetId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad member id.');
+    }
+    const role = ((_b = body === null || body === void 0 ? void 0 : body.role) !== null && _b !== void 0 ? _b : '').toString();
+    if (role !== 'admin' && role !== 'member') {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Role must be admin or member.');
+    }
+    const org = yield prisma.organization.findUnique({ where: { id: orgId } });
+    if (!org)
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Org not found.');
+    // The founder is always an admin — blocking their demotion prevents an org
+    // from ever being left with no admin.
+    if (role === 'member' && targetId === org.adminUserId) {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'The organization owner always stays an admin.');
+    }
+    const target = yield prisma.orgMembership.findFirst({
+        where: { orgId, userId: targetId, active: true },
+    });
+    if (!target) {
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'That member is not in this org.');
+    }
+    yield prisma.orgMembership.update({
+        where: { id: target.id },
+        data: { role },
+    });
+    // Keep the org's co-admin list accurate for anything that reads it.
+    const set = new Set((_c = org.additionalAdminIds) !== null && _c !== void 0 ? _c : []);
+    if (role === 'admin') {
+        set.add(targetId);
+    }
+    else {
+        set.delete(targetId);
+    }
+    yield prisma.organization.update({
+        where: { id: orgId },
+        data: { additionalAdminIds: Array.from(set) },
+    });
+    return { ok: true, userId: targetId, role };
+});
 exports.OrgServices = {
     createOrg,
     joinOrg,
@@ -495,4 +550,5 @@ exports.OrgServices = {
     createGoal,
     bumpGoal,
     deleteGoal,
+    setMemberRole,
 };

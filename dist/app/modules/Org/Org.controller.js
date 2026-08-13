@@ -170,6 +170,16 @@ const deleteGoal = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
         data: result,
     });
 }));
+const setMemberRole = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Org_service_1.OrgServices.setMemberRole(req.user.id, req.params.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Role updated',
+        data: result,
+    });
+}));
 exports.OrgControllers = {
     createOrg,
     joinOrg,
@@ -187,4 +197,5 @@ exports.OrgControllers = {
     createGoal,
     bumpGoal,
     deleteGoal,
+    setMemberRole,
 };

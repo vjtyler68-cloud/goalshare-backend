@@ -184,6 +184,20 @@ const deleteGoal = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const setMemberRole = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.setMemberRole(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Role updated',
+    data: result,
+  });
+});
+
 export const OrgControllers = {
   createOrg,
   joinOrg,
@@ -201,4 +215,5 @@ export const OrgControllers = {
   createGoal,
   bumpGoal,
   deleteGoal,
+  setMemberRole,
 };

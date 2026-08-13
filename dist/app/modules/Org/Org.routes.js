@@ -17,6 +17,7 @@ router.post('/summary', (0, auth_1.default)('ANY'), Org_controller_1.OrgControll
 router.post('/leave', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.leaveOrg);
 router.post('/:id/map', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.setMap); // admin — territory map
 router.post('/:id/booking', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.setBooking); // admin — scheduler
+router.post('/:id/member-role', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.setMemberRole); // admin — promote/demote co-admin
 // Team HQ (org-private) — all membership-enforced in the service layer.
 router.get('/:id/space', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.getSpace);
 router.post('/:id/post', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.createPost);
