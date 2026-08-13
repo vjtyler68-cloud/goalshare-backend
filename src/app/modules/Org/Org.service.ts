@@ -613,6 +613,7 @@ const shapeTask = (t: any) => ({
   assigneeName: t.assigneeName ?? '',
   projectId: t.projectId ?? null,
   dependsOnId: t.dependsOnId ?? null,
+  meetingId: t.meetingId ?? null,
   recurRule: t.recurRule ?? 'none',
   recurEnd: t.recurEnd,
   createdBy: t.createdBy,
@@ -675,6 +676,7 @@ const createTask = async (userId: string, orgId: string, body: any) => {
       assigneeName: (body?.assigneeName ?? '').toString().slice(0, 120),
       projectId: oidOrNull(body?.projectId),
       dependsOnId: oidOrNull(body?.dependsOnId),
+      meetingId: oidOrNull(body?.meetingId),
       recurRule,
       recurEnd: parseDate(body?.recurEnd) ?? null,
       createdBy: userId,
@@ -711,6 +713,7 @@ const updateTask = async (userId: string, taskId: string, body: any) => {
   if (body && 'dependsOnId' in body) {
     data.dependsOnId = oidOrNull(body.dependsOnId);
   }
+  if (body && 'meetingId' in body) data.meetingId = oidOrNull(body.meetingId);
   const due = parseDate(body?.dueAt);
   if (due !== undefined) data.dueAt = due;
   const fu = parseDate(body?.followUpAt);
@@ -803,6 +806,92 @@ const deleteProject = async (userId: string, projectId: string) => {
   return { ok: true };
 };
 
+// ── Meetings & Agenda (org-private) ───────────────────────────────────────────
+const shapeMeeting = (m: any) => ({
+  id: m.id,
+  orgId: m.orgId,
+  title: m.title,
+  startAt: m.startAt,
+  agenda: m.agenda ?? '',
+  notes: m.notes ?? '',
+  createdBy: m.createdBy,
+  createdByName: m.createdByName ?? '',
+  createdAt: m.createdAt,
+  updatedAt: m.updatedAt,
+});
+
+const listMeetings = async (userId: string, orgId: string) => {
+  await assertMember(userId, orgId);
+  const meetings = await prisma.orgMeeting.findMany({
+    where: { orgId },
+    orderBy: { startAt: 'desc' },
+    take: 1000,
+  });
+  return { meetings: meetings.map(shapeMeeting) };
+};
+
+const createMeeting = async (userId: string, orgId: string, body: any) => {
+  await assertMember(userId, orgId);
+  const title = (body?.title ?? '').toString().trim();
+  if (!title) throw new AppError(httpStatus.BAD_REQUEST, 'Meeting needs a title.');
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { fullName: true },
+  });
+  const meeting = await prisma.orgMeeting.create({
+    data: {
+      orgId,
+      title: title.slice(0, 200),
+      startAt: parseDate(body?.startAt) ?? null,
+      agenda: (body?.agenda ?? '').toString().slice(0, 6000),
+      notes: (body?.notes ?? '').toString().slice(0, 6000),
+      createdBy: userId,
+      createdByName: me?.fullName || 'Member',
+    },
+  });
+  return shapeMeeting(meeting);
+};
+
+const updateMeeting = async (userId: string, meetingId: string, body: any) => {
+  if (!meetingId || !OID.test(meetingId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad meeting id.');
+  }
+  const meeting = await prisma.orgMeeting.findUnique({
+    where: { id: meetingId },
+  });
+  if (!meeting) throw new AppError(httpStatus.NOT_FOUND, 'Meeting not found.');
+  await assertMember(userId, meeting.orgId);
+  const data: any = { updatedAt: new Date() };
+  if (typeof body?.title === 'string' && body.title.trim()) {
+    data.title = body.title.trim().slice(0, 200);
+  }
+  if (typeof body?.agenda === 'string') data.agenda = body.agenda.slice(0, 6000);
+  if (typeof body?.notes === 'string') data.notes = body.notes.slice(0, 6000);
+  const sa = parseDate(body?.startAt);
+  if (sa !== undefined) data.startAt = sa;
+  const updated = await prisma.orgMeeting.update({
+    where: { id: meetingId },
+    data,
+  });
+  return shapeMeeting(updated);
+};
+
+const deleteMeeting = async (userId: string, meetingId: string) => {
+  if (!meetingId || !OID.test(meetingId)) return { ok: true };
+  const meeting = await prisma.orgMeeting.findUnique({
+    where: { id: meetingId },
+  });
+  if (!meeting) return { ok: true };
+  await assertMember(userId, meeting.orgId);
+  // Keep the action items; just unlink them from the deleted meeting.
+  await prisma.orgTask.updateMany({
+    where: { meetingId },
+    data: { meetingId: null },
+  });
+  await prisma.orgMeeting.delete({ where: { id: meetingId } });
+  return { ok: true };
+};
+
 export const OrgServices = {
   createOrg,
   joinOrg,
@@ -828,4 +917,8 @@ export const OrgServices = {
   deleteTask,
   createProject,
   deleteProject,
+  listMeetings,
+  createMeeting,
+  updateMeeting,
+  deleteMeeting,
 };

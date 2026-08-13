@@ -603,7 +603,7 @@ const nextDue = (from, rule) => {
     return d;
 };
 const shapeTask = (t) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     return ({
         id: t.id,
         orgId: t.orgId,
@@ -618,10 +618,11 @@ const shapeTask = (t) => {
         assigneeName: (_d = t.assigneeName) !== null && _d !== void 0 ? _d : '',
         projectId: (_e = t.projectId) !== null && _e !== void 0 ? _e : null,
         dependsOnId: (_f = t.dependsOnId) !== null && _f !== void 0 ? _f : null,
-        recurRule: (_g = t.recurRule) !== null && _g !== void 0 ? _g : 'none',
+        meetingId: (_g = t.meetingId) !== null && _g !== void 0 ? _g : null,
+        recurRule: (_h = t.recurRule) !== null && _h !== void 0 ? _h : 'none',
         recurEnd: t.recurEnd,
         createdBy: t.createdBy,
-        createdByName: (_h = t.createdByName) !== null && _h !== void 0 ? _h : '',
+        createdByName: (_j = t.createdByName) !== null && _j !== void 0 ? _j : '',
         completedAt: t.completedAt,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
@@ -683,6 +684,7 @@ const createTask = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, fu
             assigneeName: ((_f = body === null || body === void 0 ? void 0 : body.assigneeName) !== null && _f !== void 0 ? _f : '').toString().slice(0, 120),
             projectId: oidOrNull(body === null || body === void 0 ? void 0 : body.projectId),
             dependsOnId: oidOrNull(body === null || body === void 0 ? void 0 : body.dependsOnId),
+            meetingId: oidOrNull(body === null || body === void 0 ? void 0 : body.meetingId),
             recurRule,
             recurEnd: (_g = parseDate(body === null || body === void 0 ? void 0 : body.recurEnd)) !== null && _g !== void 0 ? _g : null,
             createdBy: userId,
@@ -724,6 +726,8 @@ const updateTask = (userId, taskId, body) => __awaiter(void 0, void 0, void 0, f
     if (body && 'dependsOnId' in body) {
         data.dependsOnId = oidOrNull(body.dependsOnId);
     }
+    if (body && 'meetingId' in body)
+        data.meetingId = oidOrNull(body.meetingId);
     const due = parseDate(body === null || body === void 0 ? void 0 : body.dueAt);
     if (due !== undefined)
         data.dueAt = due;
@@ -821,6 +825,98 @@ const deleteProject = (userId, projectId) => __awaiter(void 0, void 0, void 0, f
     yield prisma.orgProject.delete({ where: { id: projectId } });
     return { ok: true };
 });
+// ── Meetings & Agenda (org-private) ───────────────────────────────────────────
+const shapeMeeting = (m) => {
+    var _a, _b, _c;
+    return ({
+        id: m.id,
+        orgId: m.orgId,
+        title: m.title,
+        startAt: m.startAt,
+        agenda: (_a = m.agenda) !== null && _a !== void 0 ? _a : '',
+        notes: (_b = m.notes) !== null && _b !== void 0 ? _b : '',
+        createdBy: m.createdBy,
+        createdByName: (_c = m.createdByName) !== null && _c !== void 0 ? _c : '',
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+    });
+};
+const listMeetings = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* () {
+    yield assertMember(userId, orgId);
+    const meetings = yield prisma.orgMeeting.findMany({
+        where: { orgId },
+        orderBy: { startAt: 'desc' },
+        take: 1000,
+    });
+    return { meetings: meetings.map(shapeMeeting) };
+});
+const createMeeting = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    yield assertMember(userId, orgId);
+    const title = ((_a = body === null || body === void 0 ? void 0 : body.title) !== null && _a !== void 0 ? _a : '').toString().trim();
+    if (!title)
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Meeting needs a title.');
+    const me = yield prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullName: true },
+    });
+    const meeting = yield prisma.orgMeeting.create({
+        data: {
+            orgId,
+            title: title.slice(0, 200),
+            startAt: (_b = parseDate(body === null || body === void 0 ? void 0 : body.startAt)) !== null && _b !== void 0 ? _b : null,
+            agenda: ((_c = body === null || body === void 0 ? void 0 : body.agenda) !== null && _c !== void 0 ? _c : '').toString().slice(0, 6000),
+            notes: ((_d = body === null || body === void 0 ? void 0 : body.notes) !== null && _d !== void 0 ? _d : '').toString().slice(0, 6000),
+            createdBy: userId,
+            createdByName: (me === null || me === void 0 ? void 0 : me.fullName) || 'Member',
+        },
+    });
+    return shapeMeeting(meeting);
+});
+const updateMeeting = (userId, meetingId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!meetingId || !OID.test(meetingId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad meeting id.');
+    }
+    const meeting = yield prisma.orgMeeting.findUnique({
+        where: { id: meetingId },
+    });
+    if (!meeting)
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Meeting not found.');
+    yield assertMember(userId, meeting.orgId);
+    const data = { updatedAt: new Date() };
+    if (typeof (body === null || body === void 0 ? void 0 : body.title) === 'string' && body.title.trim()) {
+        data.title = body.title.trim().slice(0, 200);
+    }
+    if (typeof (body === null || body === void 0 ? void 0 : body.agenda) === 'string')
+        data.agenda = body.agenda.slice(0, 6000);
+    if (typeof (body === null || body === void 0 ? void 0 : body.notes) === 'string')
+        data.notes = body.notes.slice(0, 6000);
+    const sa = parseDate(body === null || body === void 0 ? void 0 : body.startAt);
+    if (sa !== undefined)
+        data.startAt = sa;
+    const updated = yield prisma.orgMeeting.update({
+        where: { id: meetingId },
+        data,
+    });
+    return shapeMeeting(updated);
+});
+const deleteMeeting = (userId, meetingId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!meetingId || !OID.test(meetingId))
+        return { ok: true };
+    const meeting = yield prisma.orgMeeting.findUnique({
+        where: { id: meetingId },
+    });
+    if (!meeting)
+        return { ok: true };
+    yield assertMember(userId, meeting.orgId);
+    // Keep the action items; just unlink them from the deleted meeting.
+    yield prisma.orgTask.updateMany({
+        where: { meetingId },
+        data: { meetingId: null },
+    });
+    yield prisma.orgMeeting.delete({ where: { id: meetingId } });
+    return { ok: true };
+});
 exports.OrgServices = {
     createOrg,
     joinOrg,
@@ -846,4 +942,8 @@ exports.OrgServices = {
     deleteTask,
     createProject,
     deleteProject,
+    listMeetings,
+    createMeeting,
+    updateMeeting,
+    deleteMeeting,
 };

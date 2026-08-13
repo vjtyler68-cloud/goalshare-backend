@@ -32,5 +32,9 @@ router.patch('/task/:taskId', auth('ANY'), OrgControllers.updateTask);
 router.delete('/task/:taskId', auth('ANY'), OrgControllers.deleteTask);
 router.post('/:id/project', auth('ANY'), OrgControllers.createProject);
 router.delete('/project/:projectId', auth('ANY'), OrgControllers.deleteProject);
+router.get('/:id/meetings', auth('ANY'), OrgControllers.listMeetings);
+router.post('/:id/meeting', auth('ANY'), OrgControllers.createMeeting);
+router.patch('/meeting/:meetingId', auth('ANY'), OrgControllers.updateMeeting);
+router.delete('/meeting/:meetingId', auth('ANY'), OrgControllers.deleteMeeting);
 
 export const OrgRoutes = router;

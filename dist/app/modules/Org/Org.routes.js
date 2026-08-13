@@ -34,4 +34,8 @@ router.patch('/task/:taskId', (0, auth_1.default)('ANY'), Org_controller_1.OrgCo
 router.delete('/task/:taskId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.deleteTask);
 router.post('/:id/project', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.createProject);
 router.delete('/project/:projectId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.deleteProject);
+router.get('/:id/meetings', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.listMeetings);
+router.post('/:id/meeting', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.createMeeting);
+router.patch('/meeting/:meetingId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.updateMeeting);
+router.delete('/meeting/:meetingId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.deleteMeeting);
 exports.OrgRoutes = router;

@@ -100,6 +100,7 @@ model OrgTask {
 
     projectId   String? @db.ObjectId
     dependsOnId String? @db.ObjectId // blocked until that task is done
+    meetingId   String? @db.ObjectId // action item that came out of a meeting
 
     recurRule String    @default("none") // none | daily | weekly | monthly | quarterly
     recurEnd  DateTime?
@@ -112,6 +113,23 @@ model OrgTask {
     updatedAt   DateTime  @updatedAt
 
     @@map("orgtask")
+}
+
+// A meeting inside an org's Task Hub — a title, time, agenda, and notes.
+// Action items are OrgTasks that carry this meeting's id (meetingId).
+model OrgMeeting {
+    id            String    @id @default(auto()) @map("_id") @db.ObjectId
+    orgId         String    @db.ObjectId
+    title         String
+    startAt       DateTime?
+    agenda        String    @default("") // agenda (can be multi-line)
+    notes         String    @default("") // minutes / decisions
+    createdBy     String    @db.ObjectId
+    createdByName String    @default("")
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    @@map("orgmeeting")
 }
 
 model OrgMembership {

@@ -248,6 +248,44 @@ const deleteProject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, 
         data: result,
     });
 }));
+const listMeetings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Org_service_1.OrgServices.listMeetings(req.user.id, req.params.id);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Meetings',
+        data: result,
+    });
+}));
+const createMeeting = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Org_service_1.OrgServices.createMeeting(req.user.id, req.params.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Meeting created',
+        data: result,
+    });
+}));
+const updateMeeting = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Org_service_1.OrgServices.updateMeeting(req.user.id, req.params.meetingId, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Meeting updated',
+        data: result,
+    });
+}));
+const deleteMeeting = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Org_service_1.OrgServices.deleteMeeting(req.user.id, req.params.meetingId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Meeting deleted',
+        data: result,
+    });
+}));
 exports.OrgControllers = {
     createOrg,
     joinOrg,
@@ -273,4 +311,8 @@ exports.OrgControllers = {
     deleteTask,
     createProject,
     deleteProject,
+    listMeetings,
+    createMeeting,
+    updateMeeting,
+    deleteMeeting,
 };

@@ -288,6 +288,57 @@ const deleteProject = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const listMeetings = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.listMeetings(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Meetings',
+    data: result,
+  });
+});
+
+const createMeeting = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.createMeeting(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Meeting created',
+    data: result,
+  });
+});
+
+const updateMeeting = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.updateMeeting(
+    req.user.id,
+    req.params.meetingId,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Meeting updated',
+    data: result,
+  });
+});
+
+const deleteMeeting = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.deleteMeeting(
+    req.user.id,
+    req.params.meetingId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Meeting deleted',
+    data: result,
+  });
+});
+
 export const OrgControllers = {
   createOrg,
   joinOrg,
@@ -313,4 +364,8 @@ export const OrgControllers = {
   deleteTask,
   createProject,
   deleteProject,
+  listMeetings,
+  createMeeting,
+  updateMeeting,
+  deleteMeeting,
 };
