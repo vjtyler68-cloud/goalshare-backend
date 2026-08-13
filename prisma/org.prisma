@@ -61,6 +61,54 @@ model OrgGoal {
     @@map("orggoal")
 }
 
+// A project/initiative that groups tasks inside an org's Task Hub. Members only.
+model OrgProject {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    orgId     String   @db.ObjectId
+    name      String
+    color     String   @default("")
+    createdBy String   @db.ObjectId
+    createdAt DateTime @default(now())
+
+    @@map("orgproject")
+}
+
+// A shared, assignable task inside an org's Task Hub — the backbone of the
+// capture → organize → prioritize → schedule → assign → follow-up → review →
+// report workflow. Only members of the org ever see or edit these.
+model OrgTask {
+    id    String @id @default(auto()) @map("_id") @db.ObjectId
+    orgId String @db.ObjectId
+
+    title String
+    notes String @default("")
+
+    status   String @default("todo") // todo | in_progress | waiting | approval | done
+    priority String @default("medium") // low | medium | high | urgent
+
+    dueAt      DateTime?
+    followUpAt DateTime?
+    waitingOn  String    @default("") // who/what this is waiting on
+
+    assigneeId   String? @db.ObjectId // null = unassigned
+    assigneeName String  @default("")
+
+    projectId   String? @db.ObjectId
+    dependsOnId String? @db.ObjectId // blocked until that task is done
+
+    recurRule String    @default("none") // none | daily | weekly | monthly | quarterly
+    recurEnd  DateTime?
+
+    createdBy     String @db.ObjectId
+    createdByName String @default("")
+
+    completedAt DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    @@map("orgtask")
+}
+
 model OrgMembership {
     id     String  @id @default(auto()) @map("_id") @db.ObjectId
     orgId  String  @db.ObjectId

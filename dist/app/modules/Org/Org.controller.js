@@ -180,6 +180,64 @@ const setMemberRole = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, 
         data: result,
     });
 }));
+// ── Task Hub ──────────────────────────────────────────────────────────────
+const listTasks = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Org_service_1.OrgServices.listTasks(req.user.id, req.params.id);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Tasks',
+        data: result,
+    });
+}));
+const createTask = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Org_service_1.OrgServices.createTask(req.user.id, req.params.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Task created',
+        data: result,
+    });
+}));
+const updateTask = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Org_service_1.OrgServices.updateTask(req.user.id, req.params.taskId, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Task updated',
+        data: result,
+    });
+}));
+const deleteTask = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Org_service_1.OrgServices.deleteTask(req.user.id, req.params.taskId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Task deleted',
+        data: result,
+    });
+}));
+const createProject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Org_service_1.OrgServices.createProject(req.user.id, req.params.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Project created',
+        data: result,
+    });
+}));
+const deleteProject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Org_service_1.OrgServices.deleteProject(req.user.id, req.params.projectId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Project deleted',
+        data: result,
+    });
+}));
 exports.OrgControllers = {
     createOrg,
     joinOrg,
@@ -198,4 +256,10 @@ exports.OrgControllers = {
     bumpGoal,
     deleteGoal,
     setMemberRole,
+    listTasks,
+    createTask,
+    updateTask,
+    deleteTask,
+    createProject,
+    deleteProject,
 };

@@ -198,6 +198,82 @@ const setMemberRole = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// ── Task Hub ──────────────────────────────────────────────────────────────
+const listTasks = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.listTasks(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Tasks',
+    data: result,
+  });
+});
+
+const createTask = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.createTask(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Task created',
+    data: result,
+  });
+});
+
+const updateTask = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.updateTask(
+    req.user.id,
+    req.params.taskId,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Task updated',
+    data: result,
+  });
+});
+
+const deleteTask = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.deleteTask(req.user.id, req.params.taskId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Task deleted',
+    data: result,
+  });
+});
+
+const createProject = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.createProject(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Project created',
+    data: result,
+  });
+});
+
+const deleteProject = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.deleteProject(
+    req.user.id,
+    req.params.projectId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Project deleted',
+    data: result,
+  });
+});
+
 export const OrgControllers = {
   createOrg,
   joinOrg,
@@ -216,4 +292,10 @@ export const OrgControllers = {
   bumpGoal,
   deleteGoal,
   setMemberRole,
+  listTasks,
+  createTask,
+  updateTask,
+  deleteTask,
+  createProject,
+  deleteProject,
 };

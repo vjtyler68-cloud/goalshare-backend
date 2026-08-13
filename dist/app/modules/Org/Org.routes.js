@@ -26,4 +26,11 @@ router.delete('/post/:postId', (0, auth_1.default)('ANY'), Org_controller_1.OrgC
 router.post('/:id/goal', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.createGoal);
 router.post('/goal/:goalId/bump', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.bumpGoal);
 router.delete('/goal/:goalId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.deleteGoal);
+// Task Hub (org-private tasks + projects) — all membership-enforced.
+router.get('/:id/tasks', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.listTasks);
+router.post('/:id/task', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.createTask);
+router.patch('/task/:taskId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.updateTask);
+router.delete('/task/:taskId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.deleteTask);
+router.post('/:id/project', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.createProject);
+router.delete('/project/:projectId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.deleteProject);
 exports.OrgRoutes = router;

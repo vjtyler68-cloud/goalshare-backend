@@ -533,6 +533,263 @@ const setMemberRole = (userId, orgId, body) => __awaiter(void 0, void 0, void 0,
     });
     return { ok: true, userId: targetId, role };
 });
+// ── Task Hub (org-private tasks + projects) ───────────────────────────────────
+// Shared, assignable tasks for the org's capture → organize → prioritize →
+// schedule → assign → follow-up → review → report workflow. Every read/write is
+// gated on membership in that org (assertMember), so tasks never leak.
+const TASK_STATUS = ['todo', 'in_progress', 'waiting', 'approval', 'done'];
+const TASK_PRIORITY = ['low', 'medium', 'high', 'urgent'];
+const RECUR = ['none', 'daily', 'weekly', 'monthly', 'quarterly'];
+const oidOrNull = (v) => {
+    const s = (v !== null && v !== void 0 ? v : '').toString();
+    return OID.test(s) ? s : null;
+};
+// undefined = field not provided (leave unchanged); null = explicit clear.
+const parseDate = (v) => {
+    if (v === undefined)
+        return undefined;
+    if (v === null || v === '')
+        return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? undefined : d;
+};
+const nextDue = (from, rule) => {
+    const d = new Date(from);
+    switch (rule) {
+        case 'daily':
+            d.setDate(d.getDate() + 1);
+            break;
+        case 'weekly':
+            d.setDate(d.getDate() + 7);
+            break;
+        case 'monthly':
+            d.setMonth(d.getMonth() + 1);
+            break;
+        case 'quarterly':
+            d.setMonth(d.getMonth() + 3);
+            break;
+    }
+    return d;
+};
+const shapeTask = (t) => {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    return ({
+        id: t.id,
+        orgId: t.orgId,
+        title: t.title,
+        notes: (_a = t.notes) !== null && _a !== void 0 ? _a : '',
+        status: t.status,
+        priority: t.priority,
+        dueAt: t.dueAt,
+        followUpAt: t.followUpAt,
+        waitingOn: (_b = t.waitingOn) !== null && _b !== void 0 ? _b : '',
+        assigneeId: (_c = t.assigneeId) !== null && _c !== void 0 ? _c : null,
+        assigneeName: (_d = t.assigneeName) !== null && _d !== void 0 ? _d : '',
+        projectId: (_e = t.projectId) !== null && _e !== void 0 ? _e : null,
+        dependsOnId: (_f = t.dependsOnId) !== null && _f !== void 0 ? _f : null,
+        recurRule: (_g = t.recurRule) !== null && _g !== void 0 ? _g : 'none',
+        recurEnd: t.recurEnd,
+        createdBy: t.createdBy,
+        createdByName: (_h = t.createdByName) !== null && _h !== void 0 ? _h : '',
+        completedAt: t.completedAt,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+    });
+};
+const shapeProject = (p) => {
+    var _a;
+    return ({
+        id: p.id,
+        orgId: p.orgId,
+        name: p.name,
+        color: (_a = p.color) !== null && _a !== void 0 ? _a : '',
+        createdBy: p.createdBy,
+        createdAt: p.createdAt,
+    });
+};
+/** Everything the Task Hub needs for an org: all tasks + all projects. */
+const listTasks = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* () {
+    yield assertMember(userId, orgId);
+    const [tasks, projects] = yield Promise.all([
+        prisma.orgTask.findMany({
+            where: { orgId },
+            orderBy: { createdAt: 'desc' },
+            take: 3000,
+        }),
+        prisma.orgProject.findMany({
+            where: { orgId },
+            orderBy: { createdAt: 'asc' },
+        }),
+    ]);
+    return { tasks: tasks.map(shapeTask), projects: projects.map(shapeProject) };
+});
+const createTask = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g;
+    yield assertMember(userId, orgId);
+    const title = ((_a = body === null || body === void 0 ? void 0 : body.title) !== null && _a !== void 0 ? _a : '').toString().trim();
+    if (!title)
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Task needs a title.');
+    const me = yield prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullName: true },
+    });
+    const status = TASK_STATUS.includes(body === null || body === void 0 ? void 0 : body.status) ? body.status : 'todo';
+    const priority = TASK_PRIORITY.includes(body === null || body === void 0 ? void 0 : body.priority)
+        ? body.priority
+        : 'medium';
+    const recurRule = RECUR.includes(body === null || body === void 0 ? void 0 : body.recurRule) ? body.recurRule : 'none';
+    const task = yield prisma.orgTask.create({
+        data: {
+            orgId,
+            title: title.slice(0, 200),
+            notes: ((_b = body === null || body === void 0 ? void 0 : body.notes) !== null && _b !== void 0 ? _b : '').toString().slice(0, 4000),
+            status,
+            priority,
+            dueAt: (_c = parseDate(body === null || body === void 0 ? void 0 : body.dueAt)) !== null && _c !== void 0 ? _c : null,
+            followUpAt: (_d = parseDate(body === null || body === void 0 ? void 0 : body.followUpAt)) !== null && _d !== void 0 ? _d : null,
+            waitingOn: ((_e = body === null || body === void 0 ? void 0 : body.waitingOn) !== null && _e !== void 0 ? _e : '').toString().slice(0, 200),
+            assigneeId: oidOrNull(body === null || body === void 0 ? void 0 : body.assigneeId),
+            assigneeName: ((_f = body === null || body === void 0 ? void 0 : body.assigneeName) !== null && _f !== void 0 ? _f : '').toString().slice(0, 120),
+            projectId: oidOrNull(body === null || body === void 0 ? void 0 : body.projectId),
+            dependsOnId: oidOrNull(body === null || body === void 0 ? void 0 : body.dependsOnId),
+            recurRule,
+            recurEnd: (_g = parseDate(body === null || body === void 0 ? void 0 : body.recurEnd)) !== null && _g !== void 0 ? _g : null,
+            createdBy: userId,
+            createdByName: (me === null || me === void 0 ? void 0 : me.fullName) || 'Member',
+        },
+    });
+    return shapeTask(task);
+});
+/** Update any task field. Completing a recurring task spawns the next one. */
+const updateTask = (userId, taskId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    if (!taskId || !OID.test(taskId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad task id.');
+    }
+    const task = yield prisma.orgTask.findUnique({ where: { id: taskId } });
+    if (!task)
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Task not found.');
+    yield assertMember(userId, task.orgId);
+    const data = { updatedAt: new Date() };
+    if (typeof (body === null || body === void 0 ? void 0 : body.title) === 'string' && body.title.trim()) {
+        data.title = body.title.trim().slice(0, 200);
+    }
+    if (typeof (body === null || body === void 0 ? void 0 : body.notes) === 'string')
+        data.notes = body.notes.slice(0, 4000);
+    if (TASK_PRIORITY.includes(body === null || body === void 0 ? void 0 : body.priority))
+        data.priority = body.priority;
+    if (RECUR.includes(body === null || body === void 0 ? void 0 : body.recurRule))
+        data.recurRule = body.recurRule;
+    if (typeof (body === null || body === void 0 ? void 0 : body.waitingOn) === 'string') {
+        data.waitingOn = body.waitingOn.slice(0, 200);
+    }
+    if (body && 'assigneeId' in body)
+        data.assigneeId = oidOrNull(body.assigneeId);
+    if (typeof (body === null || body === void 0 ? void 0 : body.assigneeName) === 'string') {
+        data.assigneeName = body.assigneeName.slice(0, 120);
+    }
+    if (body && 'projectId' in body)
+        data.projectId = oidOrNull(body.projectId);
+    if (body && 'dependsOnId' in body) {
+        data.dependsOnId = oidOrNull(body.dependsOnId);
+    }
+    const due = parseDate(body === null || body === void 0 ? void 0 : body.dueAt);
+    if (due !== undefined)
+        data.dueAt = due;
+    const fu = parseDate(body === null || body === void 0 ? void 0 : body.followUpAt);
+    if (fu !== undefined)
+        data.followUpAt = fu;
+    const re = parseDate(body === null || body === void 0 ? void 0 : body.recurEnd);
+    if (re !== undefined)
+        data.recurEnd = re;
+    let spawned = null;
+    if (TASK_STATUS.includes(body === null || body === void 0 ? void 0 : body.status)) {
+        data.status = body.status;
+        if (body.status === 'done' && task.status !== 'done') {
+            data.completedAt = new Date();
+            if (((_a = task.recurRule) !== null && _a !== void 0 ? _a : 'none') !== 'none') {
+                const base = task.dueAt ? new Date(task.dueAt) : new Date();
+                const nd = nextDue(base, task.recurRule);
+                if (!task.recurEnd || nd <= new Date(task.recurEnd)) {
+                    spawned = yield prisma.orgTask.create({
+                        data: {
+                            orgId: task.orgId,
+                            title: task.title,
+                            notes: task.notes,
+                            status: 'todo',
+                            priority: task.priority,
+                            dueAt: nd,
+                            followUpAt: null,
+                            waitingOn: task.waitingOn,
+                            assigneeId: task.assigneeId,
+                            assigneeName: task.assigneeName,
+                            projectId: task.projectId,
+                            dependsOnId: null,
+                            recurRule: task.recurRule,
+                            recurEnd: task.recurEnd,
+                            createdBy: userId,
+                            createdByName: task.createdByName,
+                        },
+                    });
+                }
+            }
+        }
+        else if (body.status !== 'done') {
+            data.completedAt = null;
+        }
+    }
+    const updated = yield prisma.orgTask.update({
+        where: { id: taskId },
+        data,
+    });
+    return {
+        task: shapeTask(updated),
+        spawned: spawned ? shapeTask(spawned) : null,
+    };
+});
+const deleteTask = (userId, taskId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!taskId || !OID.test(taskId))
+        return { ok: true };
+    const task = yield prisma.orgTask.findUnique({ where: { id: taskId } });
+    if (!task)
+        return { ok: true };
+    yield assertMember(userId, task.orgId);
+    yield prisma.orgTask.delete({ where: { id: taskId } });
+    return { ok: true };
+});
+const createProject = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    yield assertMember(userId, orgId);
+    const name = ((_a = body === null || body === void 0 ? void 0 : body.name) !== null && _a !== void 0 ? _a : '').toString().trim();
+    if (!name)
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Project needs a name.');
+    const project = yield prisma.orgProject.create({
+        data: {
+            orgId,
+            name: name.slice(0, 120),
+            color: ((_b = body === null || body === void 0 ? void 0 : body.color) !== null && _b !== void 0 ? _b : '').toString().slice(0, 20),
+            createdBy: userId,
+        },
+    });
+    return shapeProject(project);
+});
+const deleteProject = (userId, projectId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!projectId || !OID.test(projectId))
+        return { ok: true };
+    const project = yield prisma.orgProject.findUnique({
+        where: { id: projectId },
+    });
+    if (!project)
+        return { ok: true };
+    yield assertMember(userId, project.orgId);
+    // Detach tasks from the deleted project rather than orphaning them.
+    yield prisma.orgTask.updateMany({
+        where: { projectId },
+        data: { projectId: null },
+    });
+    yield prisma.orgProject.delete({ where: { id: projectId } });
+    return { ok: true };
+});
 exports.OrgServices = {
     createOrg,
     joinOrg,
@@ -551,4 +808,10 @@ exports.OrgServices = {
     bumpGoal,
     deleteGoal,
     setMemberRole,
+    listTasks,
+    createTask,
+    updateTask,
+    deleteTask,
+    createProject,
+    deleteProject,
 };

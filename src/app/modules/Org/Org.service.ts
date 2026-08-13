@@ -526,6 +526,251 @@ const setMemberRole = async (userId: string, orgId: string, body: any) => {
   return { ok: true, userId: targetId, role };
 };
 
+// ── Task Hub (org-private tasks + projects) ───────────────────────────────────
+// Shared, assignable tasks for the org's capture → organize → prioritize →
+// schedule → assign → follow-up → review → report workflow. Every read/write is
+// gated on membership in that org (assertMember), so tasks never leak.
+
+const TASK_STATUS = ['todo', 'in_progress', 'waiting', 'approval', 'done'];
+const TASK_PRIORITY = ['low', 'medium', 'high', 'urgent'];
+const RECUR = ['none', 'daily', 'weekly', 'monthly', 'quarterly'];
+
+const oidOrNull = (v: any): string | null => {
+  const s = (v ?? '').toString();
+  return OID.test(s) ? s : null;
+};
+
+// undefined = field not provided (leave unchanged); null = explicit clear.
+const parseDate = (v: any): Date | null | undefined => {
+  if (v === undefined) return undefined;
+  if (v === null || v === '') return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : d;
+};
+
+const nextDue = (from: Date, rule: string): Date => {
+  const d = new Date(from);
+  switch (rule) {
+    case 'daily':
+      d.setDate(d.getDate() + 1);
+      break;
+    case 'weekly':
+      d.setDate(d.getDate() + 7);
+      break;
+    case 'monthly':
+      d.setMonth(d.getMonth() + 1);
+      break;
+    case 'quarterly':
+      d.setMonth(d.getMonth() + 3);
+      break;
+  }
+  return d;
+};
+
+const shapeTask = (t: any) => ({
+  id: t.id,
+  orgId: t.orgId,
+  title: t.title,
+  notes: t.notes ?? '',
+  status: t.status,
+  priority: t.priority,
+  dueAt: t.dueAt,
+  followUpAt: t.followUpAt,
+  waitingOn: t.waitingOn ?? '',
+  assigneeId: t.assigneeId ?? null,
+  assigneeName: t.assigneeName ?? '',
+  projectId: t.projectId ?? null,
+  dependsOnId: t.dependsOnId ?? null,
+  recurRule: t.recurRule ?? 'none',
+  recurEnd: t.recurEnd,
+  createdBy: t.createdBy,
+  createdByName: t.createdByName ?? '',
+  completedAt: t.completedAt,
+  createdAt: t.createdAt,
+  updatedAt: t.updatedAt,
+});
+
+const shapeProject = (p: any) => ({
+  id: p.id,
+  orgId: p.orgId,
+  name: p.name,
+  color: p.color ?? '',
+  createdBy: p.createdBy,
+  createdAt: p.createdAt,
+});
+
+/** Everything the Task Hub needs for an org: all tasks + all projects. */
+const listTasks = async (userId: string, orgId: string) => {
+  await assertMember(userId, orgId);
+  const [tasks, projects] = await Promise.all([
+    prisma.orgTask.findMany({
+      where: { orgId },
+      orderBy: { createdAt: 'desc' },
+      take: 3000,
+    }),
+    prisma.orgProject.findMany({
+      where: { orgId },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ]);
+  return { tasks: tasks.map(shapeTask), projects: projects.map(shapeProject) };
+};
+
+const createTask = async (userId: string, orgId: string, body: any) => {
+  await assertMember(userId, orgId);
+  const title = (body?.title ?? '').toString().trim();
+  if (!title) throw new AppError(httpStatus.BAD_REQUEST, 'Task needs a title.');
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { fullName: true },
+  });
+  const status = TASK_STATUS.includes(body?.status) ? body.status : 'todo';
+  const priority = TASK_PRIORITY.includes(body?.priority)
+    ? body.priority
+    : 'medium';
+  const recurRule = RECUR.includes(body?.recurRule) ? body.recurRule : 'none';
+  const task = await prisma.orgTask.create({
+    data: {
+      orgId,
+      title: title.slice(0, 200),
+      notes: (body?.notes ?? '').toString().slice(0, 4000),
+      status,
+      priority,
+      dueAt: parseDate(body?.dueAt) ?? null,
+      followUpAt: parseDate(body?.followUpAt) ?? null,
+      waitingOn: (body?.waitingOn ?? '').toString().slice(0, 200),
+      assigneeId: oidOrNull(body?.assigneeId),
+      assigneeName: (body?.assigneeName ?? '').toString().slice(0, 120),
+      projectId: oidOrNull(body?.projectId),
+      dependsOnId: oidOrNull(body?.dependsOnId),
+      recurRule,
+      recurEnd: parseDate(body?.recurEnd) ?? null,
+      createdBy: userId,
+      createdByName: me?.fullName || 'Member',
+    },
+  });
+  return shapeTask(task);
+};
+
+/** Update any task field. Completing a recurring task spawns the next one. */
+const updateTask = async (userId: string, taskId: string, body: any) => {
+  if (!taskId || !OID.test(taskId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad task id.');
+  }
+  const task = await prisma.orgTask.findUnique({ where: { id: taskId } });
+  if (!task) throw new AppError(httpStatus.NOT_FOUND, 'Task not found.');
+  await assertMember(userId, task.orgId);
+
+  const data: any = { updatedAt: new Date() };
+  if (typeof body?.title === 'string' && body.title.trim()) {
+    data.title = body.title.trim().slice(0, 200);
+  }
+  if (typeof body?.notes === 'string') data.notes = body.notes.slice(0, 4000);
+  if (TASK_PRIORITY.includes(body?.priority)) data.priority = body.priority;
+  if (RECUR.includes(body?.recurRule)) data.recurRule = body.recurRule;
+  if (typeof body?.waitingOn === 'string') {
+    data.waitingOn = body.waitingOn.slice(0, 200);
+  }
+  if (body && 'assigneeId' in body) data.assigneeId = oidOrNull(body.assigneeId);
+  if (typeof body?.assigneeName === 'string') {
+    data.assigneeName = body.assigneeName.slice(0, 120);
+  }
+  if (body && 'projectId' in body) data.projectId = oidOrNull(body.projectId);
+  if (body && 'dependsOnId' in body) {
+    data.dependsOnId = oidOrNull(body.dependsOnId);
+  }
+  const due = parseDate(body?.dueAt);
+  if (due !== undefined) data.dueAt = due;
+  const fu = parseDate(body?.followUpAt);
+  if (fu !== undefined) data.followUpAt = fu;
+  const re = parseDate(body?.recurEnd);
+  if (re !== undefined) data.recurEnd = re;
+
+  let spawned: any = null;
+  if (TASK_STATUS.includes(body?.status)) {
+    data.status = body.status;
+    if (body.status === 'done' && task.status !== 'done') {
+      data.completedAt = new Date();
+      if ((task.recurRule ?? 'none') !== 'none') {
+        const base = task.dueAt ? new Date(task.dueAt) : new Date();
+        const nd = nextDue(base, task.recurRule);
+        if (!task.recurEnd || nd <= new Date(task.recurEnd)) {
+          spawned = await prisma.orgTask.create({
+            data: {
+              orgId: task.orgId,
+              title: task.title,
+              notes: task.notes,
+              status: 'todo',
+              priority: task.priority,
+              dueAt: nd,
+              followUpAt: null,
+              waitingOn: task.waitingOn,
+              assigneeId: task.assigneeId,
+              assigneeName: task.assigneeName,
+              projectId: task.projectId,
+              dependsOnId: null,
+              recurRule: task.recurRule,
+              recurEnd: task.recurEnd,
+              createdBy: userId,
+              createdByName: task.createdByName,
+            },
+          });
+        }
+      }
+    } else if (body.status !== 'done') {
+      data.completedAt = null;
+    }
+  }
+  const updated = await prisma.orgTask.update({
+    where: { id: taskId },
+    data,
+  });
+  return {
+    task: shapeTask(updated),
+    spawned: spawned ? shapeTask(spawned) : null,
+  };
+};
+
+const deleteTask = async (userId: string, taskId: string) => {
+  if (!taskId || !OID.test(taskId)) return { ok: true };
+  const task = await prisma.orgTask.findUnique({ where: { id: taskId } });
+  if (!task) return { ok: true };
+  await assertMember(userId, task.orgId);
+  await prisma.orgTask.delete({ where: { id: taskId } });
+  return { ok: true };
+};
+
+const createProject = async (userId: string, orgId: string, body: any) => {
+  await assertMember(userId, orgId);
+  const name = (body?.name ?? '').toString().trim();
+  if (!name) throw new AppError(httpStatus.BAD_REQUEST, 'Project needs a name.');
+  const project = await prisma.orgProject.create({
+    data: {
+      orgId,
+      name: name.slice(0, 120),
+      color: (body?.color ?? '').toString().slice(0, 20),
+      createdBy: userId,
+    },
+  });
+  return shapeProject(project);
+};
+
+const deleteProject = async (userId: string, projectId: string) => {
+  if (!projectId || !OID.test(projectId)) return { ok: true };
+  const project = await prisma.orgProject.findUnique({
+    where: { id: projectId },
+  });
+  if (!project) return { ok: true };
+  await assertMember(userId, project.orgId);
+  // Detach tasks from the deleted project rather than orphaning them.
+  await prisma.orgTask.updateMany({
+    where: { projectId },
+    data: { projectId: null },
+  });
+  await prisma.orgProject.delete({ where: { id: projectId } });
+  return { ok: true };
+};
+
 export const OrgServices = {
   createOrg,
   joinOrg,
@@ -544,4 +789,10 @@ export const OrgServices = {
   bumpGoal,
   deleteGoal,
   setMemberRole,
+  listTasks,
+  createTask,
+  updateTask,
+  deleteTask,
+  createProject,
+  deleteProject,
 };

@@ -24,4 +24,12 @@ router.post('/:id/goal', auth('ANY'), OrgControllers.createGoal);
 router.post('/goal/:goalId/bump', auth('ANY'), OrgControllers.bumpGoal);
 router.delete('/goal/:goalId', auth('ANY'), OrgControllers.deleteGoal);
 
+// Task Hub (org-private tasks + projects) — all membership-enforced.
+router.get('/:id/tasks', auth('ANY'), OrgControllers.listTasks);
+router.post('/:id/task', auth('ANY'), OrgControllers.createTask);
+router.patch('/task/:taskId', auth('ANY'), OrgControllers.updateTask);
+router.delete('/task/:taskId', auth('ANY'), OrgControllers.deleteTask);
+router.post('/:id/project', auth('ANY'), OrgControllers.createProject);
+router.delete('/project/:projectId', auth('ANY'), OrgControllers.deleteProject);
+
 export const OrgRoutes = router;
