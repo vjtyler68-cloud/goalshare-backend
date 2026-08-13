@@ -35,10 +35,23 @@ const genCode = () => {
 const myActiveMembership = (userId: string) =>
   prisma.orgMembership.findFirst({ where: { userId, active: true } });
 
+/** May this user belong to MORE than one org at once? True for the owner
+ *  allowlist AND for anyone who already ADMINS an org — so an org creator can
+ *  spin up additional organizations (multi-site, demos for schools/churches/
+ *  companies) without ever leaving their current one. Reliable: it keys off
+ *  real admin membership, not just an email match. */
+const canHoldMultiple = async (userId: string): Promise<boolean> => {
+  if (await isOwner(userId)) return true;
+  const adminOf = await prisma.orgMembership.findFirst({
+    where: { userId, role: 'admin', active: true },
+  });
+  return !!adminOf;
+};
+
 /** Create an org — the creator becomes its admin. One active org per user. */
 const createOrg = async (userId: string, body: any) => {
   const existing = await myActiveMembership(userId);
-  if (existing && !(await isOwner(userId))) {
+  if (existing && !(await canHoldMultiple(userId))) {
     throw new AppError(
       httpStatus.CONFLICT,
       'You are already in an organization. Leave it first.',
@@ -71,7 +84,7 @@ const createOrg = async (userId: string, body: any) => {
 /** Join an org by invite code — the joiner becomes a member. */
 const joinOrg = async (userId: string, body: any) => {
   const existing = await myActiveMembership(userId);
-  if (existing && !(await isOwner(userId))) {
+  if (existing && !(await canHoldMultiple(userId))) {
     throw new AppError(
       httpStatus.CONFLICT,
       'You are already in an organization. Leave it first.',
@@ -110,6 +123,7 @@ const shapeOrg = (org: any, role: string) => ({
   mapLabel: org.mapLabel ?? null,
   bookingUrl: org.bookingUrl ?? null,
   bookingLabel: org.bookingLabel ?? null,
+  taskHubEnabled: org.taskHubEnabled ?? false,
   role,
   isAdmin: role === 'admin',
 });
@@ -289,6 +303,24 @@ const setBooking = async (userId: string, orgId: string, body: any) => {
   const org = await prisma.organization.update({
     where: { id: orgId },
     data: { bookingUrl, bookingLabel },
+  });
+  return { org: shapeOrg(org, mine.role) };
+};
+
+/** Turn the shared Task Hub on/off for an org. Admin only. */
+const setTaskHub = async (userId: string, orgId: string, body: any) => {
+  if (!orgId || !OID.test(orgId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad org id.');
+  }
+  const mine = await prisma.orgMembership.findFirst({
+    where: { orgId, userId, active: true },
+  });
+  if (!mine || mine.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Admins only.');
+  }
+  const org = await prisma.organization.update({
+    where: { id: orgId },
+    data: { taskHubEnabled: body?.enabled === true },
   });
   return { org: shapeOrg(org, mine.role) };
 };
@@ -789,6 +821,7 @@ export const OrgServices = {
   bumpGoal,
   deleteGoal,
   setMemberRole,
+  setTaskHub,
   listTasks,
   createTask,
   updateTask,

@@ -42,11 +42,24 @@ const genCode = () => {
     return s;
 };
 const myActiveMembership = (userId) => prisma.orgMembership.findFirst({ where: { userId, active: true } });
+/** May this user belong to MORE than one org at once? True for the owner
+ *  allowlist AND for anyone who already ADMINS an org — so an org creator can
+ *  spin up additional organizations (multi-site, demos for schools/churches/
+ *  companies) without ever leaving their current one. Reliable: it keys off
+ *  real admin membership, not just an email match. */
+const canHoldMultiple = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (yield isOwner(userId))
+        return true;
+    const adminOf = yield prisma.orgMembership.findFirst({
+        where: { userId, role: 'admin', active: true },
+    });
+    return !!adminOf;
+});
 /** Create an org — the creator becomes its admin. One active org per user. */
 const createOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const existing = yield myActiveMembership(userId);
-    if (existing && !(yield isOwner(userId))) {
+    if (existing && !(yield canHoldMultiple(userId))) {
         throw new AppError_1.default(http_status_1.default.CONFLICT, 'You are already in an organization. Leave it first.');
     }
     const name = ((_a = body === null || body === void 0 ? void 0 : body.name) !== null && _a !== void 0 ? _a : '').toString().trim();
@@ -76,7 +89,7 @@ const createOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* 
 const joinOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const existing = yield myActiveMembership(userId);
-    if (existing && !(yield isOwner(userId))) {
+    if (existing && !(yield canHoldMultiple(userId))) {
         throw new AppError_1.default(http_status_1.default.CONFLICT, 'You are already in an organization. Leave it first.');
     }
     const code = ((_a = body === null || body === void 0 ? void 0 : body.inviteCode) !== null && _a !== void 0 ? _a : '').toString().trim().toUpperCase();
@@ -102,7 +115,7 @@ const joinOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* ()
     return { org, role: 'member' };
 });
 const shapeOrg = (org, role) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     return ({
         id: org.id,
         name: org.name,
@@ -113,6 +126,7 @@ const shapeOrg = (org, role) => {
         mapLabel: (_b = org.mapLabel) !== null && _b !== void 0 ? _b : null,
         bookingUrl: (_c = org.bookingUrl) !== null && _c !== void 0 ? _c : null,
         bookingLabel: (_d = org.bookingLabel) !== null && _d !== void 0 ? _d : null,
+        taskHubEnabled: (_e = org.taskHubEnabled) !== null && _e !== void 0 ? _e : false,
         role,
         isAdmin: role === 'admin',
     });
@@ -293,6 +307,23 @@ const setBooking = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, fu
     const org = yield prisma.organization.update({
         where: { id: orgId },
         data: { bookingUrl, bookingLabel },
+    });
+    return { org: shapeOrg(org, mine.role) };
+});
+/** Turn the shared Task Hub on/off for an org. Admin only. */
+const setTaskHub = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!orgId || !OID.test(orgId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad org id.');
+    }
+    const mine = yield prisma.orgMembership.findFirst({
+        where: { orgId, userId, active: true },
+    });
+    if (!mine || mine.role !== 'admin') {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Admins only.');
+    }
+    const org = yield prisma.organization.update({
+        where: { id: orgId },
+        data: { taskHubEnabled: (body === null || body === void 0 ? void 0 : body.enabled) === true },
     });
     return { org: shapeOrg(org, mine.role) };
 });
@@ -808,6 +839,7 @@ exports.OrgServices = {
     bumpGoal,
     deleteGoal,
     setMemberRole,
+    setTaskHub,
     listTasks,
     createTask,
     updateTask,

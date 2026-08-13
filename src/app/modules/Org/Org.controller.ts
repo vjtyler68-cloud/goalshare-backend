@@ -198,6 +198,20 @@ const setMemberRole = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const setTaskHub = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.setTaskHub(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Task Hub updated',
+    data: result,
+  });
+});
+
 // ── Task Hub ──────────────────────────────────────────────────────────────
 const listTasks = catchAsync(async (req: Request, res: Response) => {
   const result = await OrgServices.listTasks(req.user.id, req.params.id);
@@ -292,6 +306,7 @@ export const OrgControllers = {
   bumpGoal,
   deleteGoal,
   setMemberRole,
+  setTaskHub,
   listTasks,
   createTask,
   updateTask,

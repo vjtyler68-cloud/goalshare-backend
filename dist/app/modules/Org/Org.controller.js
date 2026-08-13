@@ -180,6 +180,16 @@ const setMemberRole = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, 
         data: result,
     });
 }));
+const setTaskHub = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Org_service_1.OrgServices.setTaskHub(req.user.id, req.params.id, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Task Hub updated',
+        data: result,
+    });
+}));
 // ── Task Hub ──────────────────────────────────────────────────────────────
 const listTasks = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield Org_service_1.OrgServices.listTasks(req.user.id, req.params.id);
@@ -256,6 +266,7 @@ exports.OrgControllers = {
     bumpGoal,
     deleteGoal,
     setMemberRole,
+    setTaskHub,
     listTasks,
     createTask,
     updateTask,

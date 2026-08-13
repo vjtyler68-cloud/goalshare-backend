@@ -22,6 +22,10 @@ model Organization {
     bookingUrl   String?
     bookingLabel String?
 
+    // Per-org module opt-in: the shared Task Hub is OFF by default, so it only
+    // appears in orgs whose admin explicitly turns it on.
+    taskHubEnabled Boolean @default(false)
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
