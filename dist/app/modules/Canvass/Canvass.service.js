@@ -49,7 +49,7 @@ const parseJson = (s, fallback) => {
     }
 };
 const shapePin = (p) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     return {
         id: p.id,
         orgId: p.orgId,
@@ -63,19 +63,20 @@ const shapePin = (p) => {
         zip: p.zip,
         assignedRepId: (_a = p.assignedRepId) !== null && _a !== void 0 ? _a : null,
         assignedRepName: (_b = p.assignedRepName) !== null && _b !== void 0 ? _b : null,
+        territoryId: (_c = p.territoryId) !== null && _c !== void 0 ? _c : null,
         status: p.status,
-        stage: (_c = p.stage) !== null && _c !== void 0 ? _c : 'lead',
-        seeded: (_d = p.seeded) !== null && _d !== void 0 ? _d : false,
+        stage: (_d = p.stage) !== null && _d !== void 0 ? _d : 'lead',
+        seeded: (_e = p.seeded) !== null && _e !== void 0 ? _e : false,
         statusHistory: parseJson(p.statusHistory, []),
         homeownerName: p.homeownerName,
-        contactEmail: (_e = p.contactEmail) !== null && _e !== void 0 ? _e : null,
+        contactEmail: (_f = p.contactEmail) !== null && _f !== void 0 ? _f : null,
         notes: p.notes,
         notesLog: parseJson(p.notesLog, []),
         phone: p.phone,
         actionItems: parseJson(p.actionItems, {}),
-        systemSizeKw: (_f = p.systemSizeKw) !== null && _f !== void 0 ? _f : null,
-        leaseRatePerMonth: (_g = p.leaseRatePerMonth) !== null && _g !== void 0 ? _g : null,
-        leaseRatePerKwh: (_h = p.leaseRatePerKwh) !== null && _h !== void 0 ? _h : null,
+        systemSizeKw: (_g = p.systemSizeKw) !== null && _g !== void 0 ? _g : null,
+        leaseRatePerMonth: (_h = p.leaseRatePerMonth) !== null && _h !== void 0 ? _h : null,
+        leaseRatePerKwh: (_j = p.leaseRatePerKwh) !== null && _j !== void 0 ? _j : null,
         enrichment: (() => {
             try {
                 return p.enrichment ? JSON.parse(p.enrichment) : null;
@@ -84,9 +85,9 @@ const shapePin = (p) => {
                 return null;
             }
         })(),
-        enrichedAt: (_j = p.enrichedAt) !== null && _j !== void 0 ? _j : null,
+        enrichedAt: (_k = p.enrichedAt) !== null && _k !== void 0 ? _k : null,
         contact: parseJson(p.contact, null),
-        contactAt: (_k = p.contactAt) !== null && _k !== void 0 ? _k : null,
+        contactAt: (_l = p.contactAt) !== null && _l !== void 0 ? _l : null,
         visitCount: p.visitCount,
         lastVisited: p.lastVisited,
         createdAt: p.createdAt,
@@ -140,12 +141,12 @@ const listPins = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* 
     const m = yield assertMember(userId, orgId);
     const where = { orgId };
     if (m.role !== 'admin') {
-        // Reps see their own drops, ones assigned to them, AND all shared
-        // pre-loaded prospect pins (the "every home is a pin" territory map).
+        // Least privilege: reps see only their own drops or explicitly assigned
+        // doors. Territory population assigns every created door to one of the
+        // territory reps; unassigned territory doors remain admin-only.
         where.OR = [
             { repId: userId },
             { assignedRepId: userId },
-            { seeded: true },
         ];
     }
     const pins = yield prisma.canvassPin.findMany({
@@ -156,7 +157,7 @@ const listPins = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* 
     return pins.map(shapePin);
 });
 const canEdit = (userId, pin) => __awaiter(void 0, void 0, void 0, function* () {
-    if (pin.repId === userId)
+    if (pin.repId === userId || pin.assignedRepId === userId)
         return true;
     const m = yield membershipIn(userId, pin.orgId);
     return (m === null || m === void 0 ? void 0 : m.role) === 'admin';
@@ -336,12 +337,12 @@ const assertAdmin = (userId, orgId) => __awaiter(void 0, void 0, void 0, functio
     return m;
 });
 const shapeTerritory = (t) => {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g;
     let points = [];
     try {
         points = t.points ? JSON.parse(t.points) : [];
     }
-    catch (_c) {
+    catch (_h) {
         points = [];
     }
     return {
@@ -352,6 +353,11 @@ const shapeTerritory = (t) => {
         points,
         assignedRepIds: (_a = t.assignedRepIds) !== null && _a !== void 0 ? _a : [],
         assignedRepNames: (_b = t.assignedRepNames) !== null && _b !== void 0 ? _b : [],
+        populationState: (_c = t.populationState) !== null && _c !== void 0 ? _c : 'idle',
+        populationCreated: (_d = t.populationCreated) !== null && _d !== void 0 ? _d : 0,
+        populationSkipped: (_e = t.populationSkipped) !== null && _e !== void 0 ? _e : 0,
+        populationError: (_f = t.populationError) !== null && _f !== void 0 ? _f : null,
+        populatedAt: (_g = t.populatedAt) !== null && _g !== void 0 ? _g : null,
         createdBy: t.createdBy,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
@@ -360,6 +366,22 @@ const shapeTerritory = (t) => {
 const normPoints = (raw) => (Array.isArray(raw) ? raw : [])
     .map((p) => ({ lat: Number(p === null || p === void 0 ? void 0 : p.lat), lng: Number(p === null || p === void 0 ? void 0 : p.lng) }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+const inPolygon = (lat, lng, points) => {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const a = points[i];
+        const b = points[j];
+        const intersects = a.lat > lat !== b.lat > lat &&
+            lng < ((b.lng - a.lng) * (lat - a.lat)) / (b.lat - a.lat) + a.lng;
+        if (intersects)
+            inside = !inside;
+    }
+    return inside;
+};
+const addressKey = (address, city, state, zip) => [address, city, state, zip]
+    .join('|')
+    .toLowerCase()
+    .replace(/[^a-z0-9|]/g, '');
 /** Draw a territory (admin only). Needs a polygon of >= 3 points. */
 const createTerritory = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
     yield assertAdmin(userId, orgId);
@@ -445,6 +467,139 @@ const deleteTerritory = (userId, territoryId) => __awaiter(void 0, void 0, void 
     yield assertAdmin(userId, t.orgId);
     yield prisma.canvassTerritory.delete({ where: { id: territoryId } });
     return { ok: true };
+});
+/**
+ * Discover address-level doors around a saved polygon, then retain only exact
+ * point-in-polygon matches. Existing org addresses are skipped, including pins
+ * created by overlapping territories. Property/contact enrichment is never
+ * performed here.
+ */
+const populateTerritory = (userId, territoryId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!territoryId || !OID.test(territoryId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad territory id.');
+    }
+    const territory = yield prisma.canvassTerritory.findUnique({
+        where: { id: territoryId },
+    });
+    if (!territory)
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Territory not found.');
+    yield assertAdmin(userId, territory.orgId);
+    const points = normPoints(parseJson(territory.points, []));
+    if (points.length < 3) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Territory polygon is invalid.');
+    }
+    const limit = Math.min(Math.max(Number(body === null || body === void 0 ? void 0 : body.limit) || 500, 1), 1000);
+    const key = process.env.RENTCAST_API_KEY;
+    if (!key) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Property-data key not set.');
+    }
+    yield prisma.canvassTerritory.update({
+        where: { id: territoryId },
+        data: { populationState: 'running', populationError: null },
+    });
+    try {
+        const minLat = Math.min(...points.map((p) => p.lat));
+        const maxLat = Math.max(...points.map((p) => p.lat));
+        const minLng = Math.min(...points.map((p) => p.lng));
+        const maxLng = Math.max(...points.map((p) => p.lng));
+        const lat = (minLat + maxLat) / 2;
+        const lng = (minLng + maxLng) / 2;
+        const milesLat = (maxLat - minLat) * 69;
+        const milesLng = (maxLng - minLng) * 69 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2);
+        const radius = Math.min(Math.max(Math.hypot(milesLat, milesLng) / 2, 0.1), 3);
+        const doFetch = globalThis.fetch;
+        const url = `https://api.rentcast.io/v1/properties?latitude=${lat}` +
+            `&longitude=${lng}&radius=${radius}&limit=${limit}`;
+        const response = yield doFetch(url, {
+            headers: { 'X-Api-Key': key, accept: 'application/json' },
+        });
+        if (!response.ok) {
+            throw new AppError_1.default(response.status === 429
+                ? http_status_1.default.TOO_MANY_REQUESTS
+                : http_status_1.default.BAD_GATEWAY, response.status === 429
+                ? 'Property provider limit reached. Retry later.'
+                : 'Property provider unavailable.');
+        }
+        const payload = yield response.json();
+        const homes = Array.isArray(payload) ? payload : [];
+        const existing = yield prisma.canvassPin.findMany({
+            where: { orgId: territory.orgId },
+            select: { address: true, city: true, state: true, zip: true },
+        });
+        const seen = new Set(existing.map((p) => addressKey(p.address, p.city, p.state, p.zip)));
+        const creator = yield prisma.user.findUnique({
+            where: { id: userId },
+            select: { fullName: true },
+        });
+        const rows = [];
+        let skipped = 0;
+        let assignmentIndex = 0;
+        for (const home of homes) {
+            const homeLat = Number(home === null || home === void 0 ? void 0 : home.latitude);
+            const homeLng = Number(home === null || home === void 0 ? void 0 : home.longitude);
+            const address = ((home === null || home === void 0 ? void 0 : home.addressLine1) || (home === null || home === void 0 ? void 0 : home.formattedAddress) || '').toString();
+            const city = ((home === null || home === void 0 ? void 0 : home.city) || '').toString();
+            const state = ((home === null || home === void 0 ? void 0 : home.state) || '').toString();
+            const zip = ((home === null || home === void 0 ? void 0 : home.zipCode) || '').toString();
+            if (!address ||
+                !Number.isFinite(homeLat) ||
+                !Number.isFinite(homeLng) ||
+                !inPolygon(homeLat, homeLng, points)) {
+                skipped++;
+                continue;
+            }
+            const dedupe = addressKey(address, city, state, zip);
+            if (seen.has(dedupe)) {
+                skipped++;
+                continue;
+            }
+            seen.add(dedupe);
+            const repCount = territory.assignedRepIds.length;
+            const repOffset = repCount ? assignmentIndex++ % repCount : -1;
+            rows.push({
+                orgId: territory.orgId,
+                territoryId,
+                repId: userId,
+                repName: (creator === null || creator === void 0 ? void 0 : creator.fullName) || 'Team',
+                assignedRepId: repOffset >= 0 ? territory.assignedRepIds[repOffset] : null,
+                assignedRepName: repOffset >= 0 ? territory.assignedRepNames[repOffset] || 'Rep' : null,
+                lat: homeLat,
+                lng: homeLng,
+                address,
+                city,
+                state,
+                zip,
+                status: 'NV',
+                stage: 'lead',
+                seeded: true,
+                visitCount: 0,
+                lastVisited: new Date(),
+            });
+        }
+        if (rows.length)
+            yield prisma.canvassPin.createMany({ data: rows });
+        const updated = yield prisma.canvassTerritory.update({
+            where: { id: territoryId },
+            data: {
+                populationState: 'complete',
+                populationCreated: { increment: rows.length },
+                populationSkipped: { increment: skipped },
+                populationError: null,
+                populatedAt: new Date(),
+            },
+        });
+        return { territory: shapeTerritory(updated), created: rows.length, skipped };
+    }
+    catch (error) {
+        yield prisma.canvassTerritory.update({
+            where: { id: territoryId },
+            data: {
+                populationState: 'failed',
+                populationError: ((error === null || error === void 0 ? void 0 : error.message) || 'Population failed.').slice(0, 200),
+            },
+        });
+        throw error;
+    }
 });
 // ── Property enrichment (home + owner details) ──────────────────────────────
 // Looks up public property + assessor detail for an address via a data
@@ -548,6 +703,9 @@ const enrichPin = (userId, pinId, estimate) => __awaiter(void 0, void 0, void 0,
     if (!pin)
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Pin not found.');
     yield assertMember(userId, pin.orgId);
+    if (!(yield canEdit(userId, pin))) {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Not allowed to view this household.');
+    }
     const key = process.env.RENTCAST_API_KEY;
     if (!key)
         return { configured: false, found: false, data: null, cached: false };
@@ -765,6 +923,9 @@ const contactPin = (userId, pinId) => __awaiter(void 0, void 0, void 0, function
     if (!pin)
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Pin not found.');
     yield assertMember(userId, pin.orgId);
+    if (!(yield canEdit(userId, pin))) {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Not allowed to view this household.');
+    }
     // Served from cache — no provider call, no charge.
     if (pin.contactAt) {
         return {
@@ -855,6 +1016,7 @@ exports.CanvassServices = {
     listTerritories,
     updateTerritory,
     deleteTerritory,
+    populateTerritory,
     enrichAddress,
     enrichPin,
     seedArea,

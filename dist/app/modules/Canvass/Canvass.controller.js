@@ -103,6 +103,16 @@ const deleteTerritory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
         data: result,
     });
 }));
+const populateTerritory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Canvass_service_1.CanvassServices.populateTerritory(req.user.id, req.params.territoryId, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Territory populated',
+        data: result,
+    });
+}));
 const enrich = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield Canvass_service_1.CanvassServices.enrichAddress(req.user.id, req.params.orgId, req.query.address || '');
     (0, sendResponse_1.default)(res, {
@@ -151,6 +161,7 @@ exports.CanvassControllers = {
     listTerritories,
     updateTerritory,
     deleteTerritory,
+    populateTerritory,
     enrich,
     enrichPin,
     seedArea,
