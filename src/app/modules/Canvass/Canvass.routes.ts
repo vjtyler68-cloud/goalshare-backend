@@ -35,6 +35,11 @@ router.post(
   auth('ANY'),
   CanvassControllers.populateTerritory,
 );
+router.post(
+  '/territory/:territoryId/populate/cancel',
+  auth('ANY'),
+  CanvassControllers.cancelTerritoryPopulation,
+);
 router.delete(
   '/territory/:territoryId',
   auth('ANY'),

@@ -536,6 +536,32 @@ const deleteTerritory = async (userId: string, territoryId: string) => {
   return { ok: true };
 };
 
+const cancelTerritoryPopulation = async (
+  userId: string,
+  territoryId: string,
+) => {
+  if (!territoryId || !OID.test(territoryId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad territory id.');
+  }
+  const territory = await prisma.canvassTerritory.findUnique({
+    where: { id: territoryId },
+  });
+  if (!territory) {
+    throw new AppError(httpStatus.NOT_FOUND, 'Territory not found.');
+  }
+  await assertAdmin(userId, territory.orgId);
+  await prisma.canvassTerritory.updateMany({
+    where: { id: territoryId, populationState: 'running' },
+    data: {
+      populationState: 'cancelled',
+      populationError: 'Population cancelled by an admin.',
+    },
+  });
+  return shapeTerritory(
+    await prisma.canvassTerritory.findUnique({ where: { id: territoryId } }),
+  );
+};
+
 /**
  * Discover address-level doors around a saved polygon, then retain only exact
  * point-in-polygon matches. Existing org addresses are skipped, including pins
@@ -657,6 +683,12 @@ const populateTerritory = async (
         visitCount: 0,
         lastVisited: new Date(),
       });
+    }
+    const latest = await prisma.canvassTerritory.findUnique({
+      where: { id: territoryId },
+    });
+    if (latest?.populationState === 'cancelled') {
+      return { territory: shapeTerritory(latest), created: 0, skipped };
     }
     if (rows.length) await prisma.canvassPin.createMany({ data: rows });
     const updated = await prisma.canvassTerritory.update({
@@ -1118,6 +1150,7 @@ export const CanvassServices = {
   listTerritories,
   updateTerritory,
   deleteTerritory,
+  cancelTerritoryPopulation,
   populateTerritory,
   enrichAddress,
   enrichPin,

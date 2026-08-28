@@ -29,5 +29,6 @@ router.post('/:orgId/territory', (0, auth_1.default)('ANY'), Canvass_controller_
 router.get('/:orgId/territories', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.listTerritories);
 router.patch('/territory/:territoryId', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.updateTerritory);
 router.post('/territory/:territoryId/populate', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.populateTerritory);
+router.post('/territory/:territoryId/populate/cancel', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.cancelTerritoryPopulation);
 router.delete('/territory/:territoryId', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.deleteTerritory);
 exports.CanvassRoutes = router;

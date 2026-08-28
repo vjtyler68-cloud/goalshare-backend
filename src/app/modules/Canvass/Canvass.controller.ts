@@ -134,6 +134,21 @@ const populateTerritory = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const cancelTerritoryPopulation = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await CanvassServices.cancelTerritoryPopulation(
+      req.user.id,
+      req.params.territoryId,
+    );
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: 'Territory population cancelled',
+      data: result,
+    });
+  },
+);
+
 const enrich = catchAsync(async (req: Request, res: Response) => {
   const result = await CanvassServices.enrichAddress(
     req.user.id,
@@ -201,6 +216,7 @@ export const CanvassControllers = {
   updateTerritory,
   deleteTerritory,
   populateTerritory,
+  cancelTerritoryPopulation,
   enrich,
   enrichPin,
   seedArea,
