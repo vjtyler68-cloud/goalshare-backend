@@ -27,6 +27,17 @@ const assertMember = (userId, orgId) => __awaiter(void 0, void 0, void 0, functi
     const m = yield membershipIn(userId, orgId);
     if (!m)
         throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Not a member of this org.');
+    // Sales Ranch access gate: until an admin opens it to the team, only admins
+    // may use canvassing.
+    if (m.role !== 'admin') {
+        const org = yield prisma.organization.findUnique({
+            where: { id: orgId },
+            select: { canvassEnabled: true },
+        });
+        if (!(org === null || org === void 0 ? void 0 : org.canvassEnabled)) {
+            throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Sales Ranch isn’t open to the team yet.');
+        }
+    }
     return m;
 });
 const shapePin = (p) => {

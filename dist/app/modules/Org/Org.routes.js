@@ -28,6 +28,7 @@ router.post('/goal/:goalId/bump', (0, auth_1.default)('ANY'), Org_controller_1.O
 router.delete('/goal/:goalId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.deleteGoal);
 // Task Hub (org-private tasks + projects) — all membership-enforced.
 router.post('/:id/task-hub', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.setTaskHub); // admin — enable/disable the module
+router.post('/:id/canvass-access', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.setCanvass); // admin — open/close Sales Ranch to the team
 router.get('/:id/tasks', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.listTasks);
 router.post('/:id/task', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.createTask);
 router.patch('/task/:taskId', (0, auth_1.default)('ANY'), Org_controller_1.OrgControllers.updateTask);

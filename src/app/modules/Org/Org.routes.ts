@@ -26,6 +26,7 @@ router.delete('/goal/:goalId', auth('ANY'), OrgControllers.deleteGoal);
 
 // Task Hub (org-private tasks + projects) — all membership-enforced.
 router.post('/:id/task-hub', auth('ANY'), OrgControllers.setTaskHub); // admin — enable/disable the module
+router.post('/:id/canvass-access', auth('ANY'), OrgControllers.setCanvass); // admin — open/close Sales Ranch to the team
 router.get('/:id/tasks', auth('ANY'), OrgControllers.listTasks);
 router.post('/:id/task', auth('ANY'), OrgControllers.createTask);
 router.patch('/task/:taskId', auth('ANY'), OrgControllers.updateTask);

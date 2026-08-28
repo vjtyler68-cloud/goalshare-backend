@@ -115,7 +115,7 @@ const joinOrg = (userId, body) => __awaiter(void 0, void 0, void 0, function* ()
     return { org, role: 'member' };
 });
 const shapeOrg = (org, role) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     return ({
         id: org.id,
         name: org.name,
@@ -127,6 +127,8 @@ const shapeOrg = (org, role) => {
         bookingUrl: (_c = org.bookingUrl) !== null && _c !== void 0 ? _c : null,
         bookingLabel: (_d = org.bookingLabel) !== null && _d !== void 0 ? _d : null,
         taskHubEnabled: (_e = org.taskHubEnabled) !== null && _e !== void 0 ? _e : false,
+        // Sales Ranch (canvassing) team access. false = admins only.
+        canvassEnabled: (_f = org.canvassEnabled) !== null && _f !== void 0 ? _f : false,
         role,
         isAdmin: role === 'admin',
     });
@@ -324,6 +326,24 @@ const setTaskHub = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, fu
     const org = yield prisma.organization.update({
         where: { id: orgId },
         data: { taskHubEnabled: (body === null || body === void 0 ? void 0 : body.enabled) === true },
+    });
+    return { org: shapeOrg(org, mine.role) };
+});
+/** Open/close Sales Ranch (canvassing) to the whole team. Admin only; when
+ *  off, only admins can use it. */
+const setCanvass = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!orgId || !OID.test(orgId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad org id.');
+    }
+    const mine = yield prisma.orgMembership.findFirst({
+        where: { orgId, userId, active: true },
+    });
+    if (!mine || mine.role !== 'admin') {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Admins only.');
+    }
+    const org = yield prisma.organization.update({
+        where: { id: orgId },
+        data: { canvassEnabled: (body === null || body === void 0 ? void 0 : body.enabled) === true },
     });
     return { org: shapeOrg(org, mine.role) };
 });
@@ -936,6 +956,7 @@ exports.OrgServices = {
     deleteGoal,
     setMemberRole,
     setTaskHub,
+    setCanvass,
     listTasks,
     createTask,
     updateTask,

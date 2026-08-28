@@ -212,6 +212,20 @@ const setTaskHub = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const setCanvass = catchAsync(async (req: Request, res: Response) => {
+  const result = await OrgServices.setCanvass(
+    req.user.id,
+    req.params.id,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Sales Ranch access updated',
+    data: result,
+  });
+});
+
 // ── Task Hub ──────────────────────────────────────────────────────────────
 const listTasks = catchAsync(async (req: Request, res: Response) => {
   const result = await OrgServices.listTasks(req.user.id, req.params.id);
@@ -358,6 +372,7 @@ export const OrgControllers = {
   deleteGoal,
   setMemberRole,
   setTaskHub,
+  setCanvass,
   listTasks,
   createTask,
   updateTask,

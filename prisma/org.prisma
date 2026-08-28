@@ -26,6 +26,9 @@ model Organization {
     // appears in orgs whose admin explicitly turns it on. Nullable so existing
     // org documents (created before this field) read cleanly as "off".
     taskHubEnabled Boolean? @default(false)
+    // Sales Ranch (canvassing) team access. Nullable/off by default so only the
+    // admin can use it until they open it to the team.
+    canvassEnabled Boolean? @default(false)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

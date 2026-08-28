@@ -15,6 +15,20 @@ const assertMember = async (userId: string, orgId: string) => {
   }
   const m = await membershipIn(userId, orgId);
   if (!m) throw new AppError(httpStatus.FORBIDDEN, 'Not a member of this org.');
+  // Sales Ranch access gate: until an admin opens it to the team, only admins
+  // may use canvassing.
+  if (m.role !== 'admin') {
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { canvassEnabled: true },
+    });
+    if (!org?.canvassEnabled) {
+      throw new AppError(
+        httpStatus.FORBIDDEN,
+        'Sales Ranch isn’t open to the team yet.',
+      );
+    }
+  }
   return m;
 };
 

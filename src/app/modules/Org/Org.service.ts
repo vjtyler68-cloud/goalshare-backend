@@ -124,6 +124,8 @@ const shapeOrg = (org: any, role: string) => ({
   bookingUrl: org.bookingUrl ?? null,
   bookingLabel: org.bookingLabel ?? null,
   taskHubEnabled: org.taskHubEnabled ?? false,
+  // Sales Ranch (canvassing) team access. false = admins only.
+  canvassEnabled: org.canvassEnabled ?? false,
   role,
   isAdmin: role === 'admin',
 });
@@ -321,6 +323,25 @@ const setTaskHub = async (userId: string, orgId: string, body: any) => {
   const org = await prisma.organization.update({
     where: { id: orgId },
     data: { taskHubEnabled: body?.enabled === true },
+  });
+  return { org: shapeOrg(org, mine.role) };
+};
+
+/** Open/close Sales Ranch (canvassing) to the whole team. Admin only; when
+ *  off, only admins can use it. */
+const setCanvass = async (userId: string, orgId: string, body: any) => {
+  if (!orgId || !OID.test(orgId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad org id.');
+  }
+  const mine = await prisma.orgMembership.findFirst({
+    where: { orgId, userId, active: true },
+  });
+  if (!mine || mine.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Admins only.');
+  }
+  const org = await prisma.organization.update({
+    where: { id: orgId },
+    data: { canvassEnabled: body?.enabled === true },
   });
   return { org: shapeOrg(org, mine.role) };
 };
@@ -911,6 +932,7 @@ export const OrgServices = {
   deleteGoal,
   setMemberRole,
   setTaskHub,
+  setCanvass,
   listTasks,
   createTask,
   updateTask,
