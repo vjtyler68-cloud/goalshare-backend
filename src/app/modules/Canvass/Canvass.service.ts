@@ -32,13 +32,15 @@ const assertMember = async (userId: string, orgId: string) => {
   return m;
 };
 
-const shapePin = (p: any) => {
-  let history: any[] = [];
+const parseJson = (s: any, fallback: any) => {
   try {
-    history = p.statusHistory ? JSON.parse(p.statusHistory) : [];
+    return s ? JSON.parse(s) : fallback;
   } catch {
-    history = [];
+    return fallback;
   }
+};
+
+const shapePin = (p: any) => {
   return {
     id: p.id,
     orgId: p.orgId,
@@ -53,10 +55,17 @@ const shapePin = (p: any) => {
     assignedRepId: p.assignedRepId ?? null,
     assignedRepName: p.assignedRepName ?? null,
     status: p.status,
-    statusHistory: history,
+    stage: p.stage ?? 'lead',
+    statusHistory: parseJson(p.statusHistory, []),
     homeownerName: p.homeownerName,
+    contactEmail: p.contactEmail ?? null,
     notes: p.notes,
+    notesLog: parseJson(p.notesLog, []),
     phone: p.phone,
+    actionItems: parseJson(p.actionItems, {}),
+    systemSizeKw: p.systemSizeKw ?? null,
+    leaseRatePerMonth: p.leaseRatePerMonth ?? null,
+    leaseRatePerKwh: p.leaseRatePerKwh ?? null,
     enrichment: (() => {
       try {
         return p.enrichment ? JSON.parse(p.enrichment) : null;
@@ -149,27 +158,78 @@ const updatePin = async (userId: string, pinId: string, body: any) => {
   const data: any = { updatedAt: new Date() };
   if (typeof body?.homeownerName === 'string')
     data.homeownerName = body.homeownerName;
+  if (typeof body?.contactEmail === 'string')
+    data.contactEmail = body.contactEmail;
   if (typeof body?.notes === 'string') data.notes = body.notes;
   if (typeof body?.phone === 'string') data.phone = body.phone;
   if (typeof body?.address === 'string') data.address = body.address;
 
+  if (
+    typeof body?.stage === 'string' &&
+    ['lead', 'sale', 'approved', 'installed'].includes(body.stage)
+  ) {
+    data.stage = body.stage;
+  }
+  const numField = (key: string) => {
+    if (body?.[key] === undefined) return;
+    if (body[key] === null || body[key] === '') {
+      data[key] = null;
+      return;
+    }
+    const n = Number(body[key]);
+    if (Number.isFinite(n)) data[key] = n;
+  };
+  numField('systemSizeKw');
+  numField('leaseRatePerMonth');
+  numField('leaseRatePerKwh');
+
+  // Action items — merge the incoming booleans into the stored map.
+  if (body?.actionItems && typeof body.actionItems === 'object') {
+    const cur = parseJson(pin.actionItems, {});
+    data.actionItems = JSON.stringify({ ...cur, ...body.actionItems });
+  }
+
+  // Append a note to the audit trail.
+  if (typeof body?.addNote === 'string' && body.addNote.trim()) {
+    const actor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true },
+    });
+    const log = parseJson(pin.notesLog, []);
+    log.push({
+      repId: userId,
+      repName: actor?.fullName || 'Rep',
+      text: body.addNote.trim(),
+      at: new Date().toISOString(),
+    });
+    data.notesLog = JSON.stringify(log.slice(-200));
+  }
+
   const newStatus = body?.status?.toString();
   if (newStatus && newStatus !== pin.status) {
-    let history: any[] = [];
-    try {
-      history = pin.statusHistory ? JSON.parse(pin.statusHistory) : [];
-    } catch {
-      history = [];
-    }
+    const history = parseJson(pin.statusHistory, []);
+    const actor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true },
+    });
     history.push({
       status: newStatus,
       at: new Date().toISOString(),
       repId: userId,
+      repName: actor?.fullName || 'Rep',
     });
     data.status = newStatus;
     data.statusHistory = JSON.stringify(history.slice(-100));
     data.visitCount = (pin.visitCount ?? 1) + 1;
     data.lastVisited = new Date();
+    // Auto-advance the funnel when a sale is logged (unless stage set explicitly).
+    if (
+      ['SALE', 'WON', 'CS'].includes(newStatus) &&
+      (pin.stage ?? 'lead') === 'lead' &&
+      !data.stage
+    ) {
+      data.stage = 'sale';
+    }
   } else if (body?.revisit === true) {
     data.visitCount = (pin.visitCount ?? 1) + 1;
     data.lastVisited = new Date();

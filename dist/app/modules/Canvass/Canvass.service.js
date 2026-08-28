@@ -40,15 +40,16 @@ const assertMember = (userId, orgId) => __awaiter(void 0, void 0, void 0, functi
     }
     return m;
 });
-const shapePin = (p) => {
-    var _a, _b, _c;
-    let history = [];
+const parseJson = (s, fallback) => {
     try {
-        history = p.statusHistory ? JSON.parse(p.statusHistory) : [];
+        return s ? JSON.parse(s) : fallback;
     }
-    catch (_d) {
-        history = [];
+    catch (_a) {
+        return fallback;
     }
+};
+const shapePin = (p) => {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     return {
         id: p.id,
         orgId: p.orgId,
@@ -63,10 +64,17 @@ const shapePin = (p) => {
         assignedRepId: (_a = p.assignedRepId) !== null && _a !== void 0 ? _a : null,
         assignedRepName: (_b = p.assignedRepName) !== null && _b !== void 0 ? _b : null,
         status: p.status,
-        statusHistory: history,
+        stage: (_c = p.stage) !== null && _c !== void 0 ? _c : 'lead',
+        statusHistory: parseJson(p.statusHistory, []),
         homeownerName: p.homeownerName,
+        contactEmail: (_d = p.contactEmail) !== null && _d !== void 0 ? _d : null,
         notes: p.notes,
+        notesLog: parseJson(p.notesLog, []),
         phone: p.phone,
+        actionItems: parseJson(p.actionItems, {}),
+        systemSizeKw: (_e = p.systemSizeKw) !== null && _e !== void 0 ? _e : null,
+        leaseRatePerMonth: (_f = p.leaseRatePerMonth) !== null && _f !== void 0 ? _f : null,
+        leaseRatePerKwh: (_g = p.leaseRatePerKwh) !== null && _g !== void 0 ? _g : null,
         enrichment: (() => {
             try {
                 return p.enrichment ? JSON.parse(p.enrichment) : null;
@@ -75,7 +83,7 @@ const shapePin = (p) => {
                 return null;
             }
         })(),
-        enrichedAt: (_c = p.enrichedAt) !== null && _c !== void 0 ? _c : null,
+        enrichedAt: (_h = p.enrichedAt) !== null && _h !== void 0 ? _h : null,
         visitCount: p.visitCount,
         lastVisited: p.lastVisited,
         createdAt: p.createdAt,
@@ -146,7 +154,7 @@ const canEdit = (userId, pin) => __awaiter(void 0, void 0, void 0, function* () 
 });
 /** Update a pin — status change appends history + bumps visitCount. */
 const updatePin = (userId, pinId, body) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     if (!pinId || !OID.test(pinId)) {
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad pin id.');
     }
@@ -159,33 +167,78 @@ const updatePin = (userId, pinId, body) => __awaiter(void 0, void 0, void 0, fun
     const data = { updatedAt: new Date() };
     if (typeof (body === null || body === void 0 ? void 0 : body.homeownerName) === 'string')
         data.homeownerName = body.homeownerName;
+    if (typeof (body === null || body === void 0 ? void 0 : body.contactEmail) === 'string')
+        data.contactEmail = body.contactEmail;
     if (typeof (body === null || body === void 0 ? void 0 : body.notes) === 'string')
         data.notes = body.notes;
     if (typeof (body === null || body === void 0 ? void 0 : body.phone) === 'string')
         data.phone = body.phone;
     if (typeof (body === null || body === void 0 ? void 0 : body.address) === 'string')
         data.address = body.address;
+    if (typeof (body === null || body === void 0 ? void 0 : body.stage) === 'string' &&
+        ['lead', 'sale', 'approved', 'installed'].includes(body.stage)) {
+        data.stage = body.stage;
+    }
+    const numField = (key) => {
+        if ((body === null || body === void 0 ? void 0 : body[key]) === undefined)
+            return;
+        if (body[key] === null || body[key] === '') {
+            data[key] = null;
+            return;
+        }
+        const n = Number(body[key]);
+        if (Number.isFinite(n))
+            data[key] = n;
+    };
+    numField('systemSizeKw');
+    numField('leaseRatePerMonth');
+    numField('leaseRatePerKwh');
+    // Action items — merge the incoming booleans into the stored map.
+    if ((body === null || body === void 0 ? void 0 : body.actionItems) && typeof body.actionItems === 'object') {
+        const cur = parseJson(pin.actionItems, {});
+        data.actionItems = JSON.stringify(Object.assign(Object.assign({}, cur), body.actionItems));
+    }
+    // Append a note to the audit trail.
+    if (typeof (body === null || body === void 0 ? void 0 : body.addNote) === 'string' && body.addNote.trim()) {
+        const actor = yield prisma.user.findUnique({
+            where: { id: userId },
+            select: { fullName: true },
+        });
+        const log = parseJson(pin.notesLog, []);
+        log.push({
+            repId: userId,
+            repName: (actor === null || actor === void 0 ? void 0 : actor.fullName) || 'Rep',
+            text: body.addNote.trim(),
+            at: new Date().toISOString(),
+        });
+        data.notesLog = JSON.stringify(log.slice(-200));
+    }
     const newStatus = (_a = body === null || body === void 0 ? void 0 : body.status) === null || _a === void 0 ? void 0 : _a.toString();
     if (newStatus && newStatus !== pin.status) {
-        let history = [];
-        try {
-            history = pin.statusHistory ? JSON.parse(pin.statusHistory) : [];
-        }
-        catch (_d) {
-            history = [];
-        }
+        const history = parseJson(pin.statusHistory, []);
+        const actor = yield prisma.user.findUnique({
+            where: { id: userId },
+            select: { fullName: true },
+        });
         history.push({
             status: newStatus,
             at: new Date().toISOString(),
             repId: userId,
+            repName: (actor === null || actor === void 0 ? void 0 : actor.fullName) || 'Rep',
         });
         data.status = newStatus;
         data.statusHistory = JSON.stringify(history.slice(-100));
         data.visitCount = ((_b = pin.visitCount) !== null && _b !== void 0 ? _b : 1) + 1;
         data.lastVisited = new Date();
+        // Auto-advance the funnel when a sale is logged (unless stage set explicitly).
+        if (['SALE', 'WON', 'CS'].includes(newStatus) &&
+            ((_c = pin.stage) !== null && _c !== void 0 ? _c : 'lead') === 'lead' &&
+            !data.stage) {
+            data.stage = 'sale';
+        }
     }
     else if ((body === null || body === void 0 ? void 0 : body.revisit) === true) {
-        data.visitCount = ((_c = pin.visitCount) !== null && _c !== void 0 ? _c : 1) + 1;
+        data.visitCount = ((_d = pin.visitCount) !== null && _d !== void 0 ? _d : 1) + 1;
         data.lastVisited = new Date();
     }
     const updated = yield prisma.canvassPin.update({

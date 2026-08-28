@@ -24,9 +24,20 @@ model CanvassPin {
     status        String // status code (APPT, NH, SLR, SALE, …)
     statusHistory String? // JSON: [{status, at, repId}]
 
+    // Pipeline stage (Canvass-style funnel): lead | sale | approved | installed
+    stage String @default("lead")
+
     homeownerName String?
+    contactEmail  String?
     notes         String?
+    notesLog      String? // JSON: [{repId, repName, text, at}]
     phone         String?
+
+    // Deal / account fields — filled once a lead progresses toward a sale.
+    actionItems       String? // JSON: {creditScore,equipment,pricing,siteAudit}
+    systemSizeKw      Float?
+    leaseRatePerMonth Float?
+    leaseRatePerKwh   Float?
 
     // Cached home + owner enrichment (JSON) so a given door is only ever looked
     // up once against the paid data provider. enrichedAt marks that a lookup was
