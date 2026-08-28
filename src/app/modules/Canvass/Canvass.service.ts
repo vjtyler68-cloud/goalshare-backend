@@ -399,36 +399,54 @@ const enrichAddress = async (
   }
   try {
     const doFetch: any = (globalThis as any).fetch;
-    const url = `https://api.rentcast.io/v1/properties?address=${encodeURIComponent(
-      addr,
-    )}`;
-    const resp = await doFetch(url, {
+    const hdr = {
       headers: { 'X-Api-Key': key, accept: 'application/json' },
-    });
-    if (!resp.ok) {
+    };
+    const enc = encodeURIComponent(addr);
+    // Property facts + a market-value estimate (AVM), in parallel.
+    const [propResp, avmResp] = await Promise.all([
+      doFetch(`https://api.rentcast.io/v1/properties?address=${enc}`, hdr).catch(
+        () => null,
+      ),
+      doFetch(`https://api.rentcast.io/v1/avm/value?address=${enc}`, hdr).catch(
+        () => null,
+      ),
+    ]);
+
+    let rec: any = null;
+    if (propResp && propResp.ok) {
+      const j = await propResp.json();
+      rec = Array.isArray(j) ? j[0] : j;
+    }
+    let avm: any = null;
+    if (avmResp && avmResp.ok) {
+      avm = await avmResp.json();
+    }
+    if (!rec && !avm) {
       return { configured: true, found: false, data: null };
     }
-    const json = await resp.json();
-    const rec = Array.isArray(json) ? json[0] : json;
-    if (!rec) {
-      return { configured: true, found: false, data: null };
-    }
+
+    const facts = rec ?? avm?.subjectProperty ?? {};
+    const numOrNull = (v: any) => (typeof v === 'number' ? v : null);
     return {
       configured: true,
       found: true,
       data: {
-        address: rec.formattedAddress ?? addr,
-        owner: ownerName(rec),
-        ownerOccupied: rec.ownerOccupied ?? null,
-        yearBuilt: rec.yearBuilt ?? null,
-        squareFootage: rec.squareFootage ?? null,
-        lotSize: rec.lotSize ?? null,
-        bedrooms: rec.bedrooms ?? null,
-        bathrooms: rec.bathrooms ?? null,
-        propertyType: rec.propertyType ?? null,
-        lastSalePrice: rec.lastSalePrice ?? null,
-        lastSaleDate: rec.lastSaleDate ?? null,
-        assessedValue: latestAssessedValue(rec),
+        address: facts.formattedAddress ?? addr,
+        owner: ownerName(facts),
+        ownerOccupied: facts.ownerOccupied ?? null,
+        yearBuilt: facts.yearBuilt ?? null,
+        squareFootage: facts.squareFootage ?? null,
+        lotSize: facts.lotSize ?? null,
+        bedrooms: facts.bedrooms ?? null,
+        bathrooms: facts.bathrooms ?? null,
+        propertyType: facts.propertyType ?? null,
+        lastSalePrice: facts.lastSalePrice ?? null,
+        lastSaleDate: facts.lastSaleDate ?? null,
+        assessedValue: latestAssessedValue(facts),
+        estimatedValue: numOrNull(avm?.price),
+        estimatedValueLow: numOrNull(avm?.priceRangeLow),
+        estimatedValueHigh: numOrNull(avm?.priceRangeHigh),
       },
     };
   } catch {

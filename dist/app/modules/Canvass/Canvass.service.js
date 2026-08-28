@@ -386,7 +386,7 @@ const ownerName = (rec) => {
 };
 /** Enrich an address with home + owner detail. Any org member may look up. */
 const enrichAddress = (userId, orgId, address) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     yield assertMember(userId, orgId);
     const key = process.env.RENTCAST_API_KEY;
     if (!key) {
@@ -398,38 +398,52 @@ const enrichAddress = (userId, orgId, address) => __awaiter(void 0, void 0, void
     }
     try {
         const doFetch = globalThis.fetch;
-        const url = `https://api.rentcast.io/v1/properties?address=${encodeURIComponent(addr)}`;
-        const resp = yield doFetch(url, {
+        const hdr = {
             headers: { 'X-Api-Key': key, accept: 'application/json' },
-        });
-        if (!resp.ok) {
+        };
+        const enc = encodeURIComponent(addr);
+        // Property facts + a market-value estimate (AVM), in parallel.
+        const [propResp, avmResp] = yield Promise.all([
+            doFetch(`https://api.rentcast.io/v1/properties?address=${enc}`, hdr).catch(() => null),
+            doFetch(`https://api.rentcast.io/v1/avm/value?address=${enc}`, hdr).catch(() => null),
+        ]);
+        let rec = null;
+        if (propResp && propResp.ok) {
+            const j = yield propResp.json();
+            rec = Array.isArray(j) ? j[0] : j;
+        }
+        let avm = null;
+        if (avmResp && avmResp.ok) {
+            avm = yield avmResp.json();
+        }
+        if (!rec && !avm) {
             return { configured: true, found: false, data: null };
         }
-        const json = yield resp.json();
-        const rec = Array.isArray(json) ? json[0] : json;
-        if (!rec) {
-            return { configured: true, found: false, data: null };
-        }
+        const facts = (_a = rec !== null && rec !== void 0 ? rec : avm === null || avm === void 0 ? void 0 : avm.subjectProperty) !== null && _a !== void 0 ? _a : {};
+        const numOrNull = (v) => (typeof v === 'number' ? v : null);
         return {
             configured: true,
             found: true,
             data: {
-                address: (_a = rec.formattedAddress) !== null && _a !== void 0 ? _a : addr,
-                owner: ownerName(rec),
-                ownerOccupied: (_b = rec.ownerOccupied) !== null && _b !== void 0 ? _b : null,
-                yearBuilt: (_c = rec.yearBuilt) !== null && _c !== void 0 ? _c : null,
-                squareFootage: (_d = rec.squareFootage) !== null && _d !== void 0 ? _d : null,
-                lotSize: (_e = rec.lotSize) !== null && _e !== void 0 ? _e : null,
-                bedrooms: (_f = rec.bedrooms) !== null && _f !== void 0 ? _f : null,
-                bathrooms: (_g = rec.bathrooms) !== null && _g !== void 0 ? _g : null,
-                propertyType: (_h = rec.propertyType) !== null && _h !== void 0 ? _h : null,
-                lastSalePrice: (_j = rec.lastSalePrice) !== null && _j !== void 0 ? _j : null,
-                lastSaleDate: (_k = rec.lastSaleDate) !== null && _k !== void 0 ? _k : null,
-                assessedValue: latestAssessedValue(rec),
+                address: (_b = facts.formattedAddress) !== null && _b !== void 0 ? _b : addr,
+                owner: ownerName(facts),
+                ownerOccupied: (_c = facts.ownerOccupied) !== null && _c !== void 0 ? _c : null,
+                yearBuilt: (_d = facts.yearBuilt) !== null && _d !== void 0 ? _d : null,
+                squareFootage: (_e = facts.squareFootage) !== null && _e !== void 0 ? _e : null,
+                lotSize: (_f = facts.lotSize) !== null && _f !== void 0 ? _f : null,
+                bedrooms: (_g = facts.bedrooms) !== null && _g !== void 0 ? _g : null,
+                bathrooms: (_h = facts.bathrooms) !== null && _h !== void 0 ? _h : null,
+                propertyType: (_j = facts.propertyType) !== null && _j !== void 0 ? _j : null,
+                lastSalePrice: (_k = facts.lastSalePrice) !== null && _k !== void 0 ? _k : null,
+                lastSaleDate: (_l = facts.lastSaleDate) !== null && _l !== void 0 ? _l : null,
+                assessedValue: latestAssessedValue(facts),
+                estimatedValue: numOrNull(avm === null || avm === void 0 ? void 0 : avm.price),
+                estimatedValueLow: numOrNull(avm === null || avm === void 0 ? void 0 : avm.priceRangeLow),
+                estimatedValueHigh: numOrNull(avm === null || avm === void 0 ? void 0 : avm.priceRangeHigh),
             },
         };
     }
-    catch (_l) {
+    catch (_m) {
         return { configured: true, found: false, data: null };
     }
 });
