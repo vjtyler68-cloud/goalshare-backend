@@ -49,6 +49,11 @@ model CanvassPin {
     enrichment String?
     enrichedAt DateTime?
 
+    // Cached skip-trace contact (JSON: {name, phones[], emails[]}) — resident
+    // name + phone/email. contactAt marks a lookup happened (one charge per door).
+    contact   String?
+    contactAt DateTime?
+
     visitCount  Int      @default(1)
     lastVisited DateTime @default(now())
 

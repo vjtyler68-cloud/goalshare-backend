@@ -163,6 +163,19 @@ const seedArea = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const contactPin = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.contactPin(
+    req.user.id,
+    req.params.pinId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Contact',
+    data: result,
+  });
+});
+
 export const CanvassControllers = {
   createPin,
   listPins,
@@ -176,4 +189,5 @@ export const CanvassControllers = {
   enrich,
   enrichPin,
   seedArea,
+  contactPin,
 };

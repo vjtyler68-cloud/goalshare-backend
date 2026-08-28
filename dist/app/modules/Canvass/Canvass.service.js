@@ -49,7 +49,7 @@ const parseJson = (s, fallback) => {
     }
 };
 const shapePin = (p) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     return {
         id: p.id,
         orgId: p.orgId,
@@ -85,6 +85,8 @@ const shapePin = (p) => {
             }
         })(),
         enrichedAt: (_j = p.enrichedAt) !== null && _j !== void 0 ? _j : null,
+        contact: parseJson(p.contact, null),
+        contactAt: (_k = p.contactAt) !== null && _k !== void 0 ? _k : null,
         visitCount: p.visitCount,
         lastVisited: p.lastVisited,
         createdAt: p.createdAt,
@@ -749,6 +751,100 @@ const seedArea = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, func
     yield prisma.canvassPin.createMany({ data: rows });
     return { created: rows.length };
 });
+/**
+ * Skip-trace a door for the resident's name + phone + email (DataSkip). Cached
+ * on the pin so a given door is only charged once, and the result fills the
+ * pin's homeownerName / phone / contactEmail so it shows everywhere.
+ */
+const contactPin = (userId, pinId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    if (!pinId || !OID.test(pinId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad pin id.');
+    }
+    const pin = yield prisma.canvassPin.findUnique({ where: { id: pinId } });
+    if (!pin)
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Pin not found.');
+    yield assertMember(userId, pin.orgId);
+    // Served from cache — no provider call, no charge.
+    if (pin.contactAt) {
+        return {
+            configured: true,
+            found: !!pin.contact,
+            data: parseJson(pin.contact, null),
+            cached: true,
+        };
+    }
+    const key = process.env.DATASKIP_API_KEY;
+    if (!key)
+        return { configured: false, found: false, data: null };
+    const addr = (pin.address || '').trim();
+    if (!addr)
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Pin has no address.');
+    let out = null;
+    try {
+        const doFetch = globalThis.fetch;
+        const resp = yield doFetch('https://app.dataskip.io/api/v1/skip-trace', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${key}`,
+                'Content-Type': 'application/json',
+                accept: 'application/json',
+            },
+            body: JSON.stringify({
+                address: addr,
+                city: pin.city || undefined,
+                state: pin.state || undefined,
+                zip: pin.zip || undefined,
+            }),
+        });
+        if (resp.ok) {
+            const j = yield resp.json();
+            if (j && j.found) {
+                const phones = Array.isArray(j.phones)
+                    ? j.phones
+                        .filter((p) => p && p.number)
+                        .map((p) => ({
+                        number: p.number.toString(),
+                        type: (p.type || 'mobile').toString(),
+                        dnc: p.dnc === true,
+                    }))
+                    : [];
+                const name = ((_a = j.contact) === null || _a === void 0 ? void 0 : _a.fullName) ||
+                    [(_b = j.contact) === null || _b === void 0 ? void 0 : _b.firstName, (_c = j.contact) === null || _c === void 0 ? void 0 : _c.lastName]
+                        .filter(Boolean)
+                        .join(' ') ||
+                    '';
+                out = {
+                    name,
+                    phones,
+                    emails: Array.isArray(j.emails)
+                        ? j.emails.map((e) => e.toString())
+                        : [],
+                };
+            }
+        }
+    }
+    catch (_d) {
+        out = null;
+    }
+    const data = {
+        contact: out ? JSON.stringify(out) : null,
+        contactAt: new Date(),
+    };
+    // Fill the door's own fields so the name/phone show everywhere.
+    if (out) {
+        if (!pin.homeownerName && out.name)
+            data.homeownerName = out.name;
+        const firstMobile = out.phones.find((p) => p.type === 'mobile') || out.phones[0];
+        if (!pin.phone && firstMobile)
+            data.phone = firstMobile.number;
+        if (!pin.contactEmail && out.emails.length) {
+            data.contactEmail = out.emails[0];
+        }
+    }
+    yield prisma.canvassPin.update({ where: { id: pinId }, data });
+    return { configured: true, found: !!out, data: out, cached: false };
+});
 exports.CanvassServices = {
     createPin,
     listPins,
@@ -762,4 +858,5 @@ exports.CanvassServices = {
     enrichAddress,
     enrichPin,
     seedArea,
+    contactPin,
 };

@@ -132,6 +132,15 @@ const seedArea = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 
         data: result,
     });
 }));
+const contactPin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Canvass_service_1.CanvassServices.contactPin(req.user.id, req.params.pinId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Contact',
+        data: result,
+    });
+}));
 exports.CanvassControllers = {
     createPin,
     listPins,
@@ -145,4 +154,5 @@ exports.CanvassControllers = {
     enrich,
     enrichPin,
     seedArea,
+    contactPin,
 };

@@ -18,6 +18,8 @@ router.delete('/pin/:pinId', auth('ANY'), CanvassControllers.deletePin);
 // Property enrichment. Pin-based is CACHED (one paid lookup per door, ever) and
 // on-demand; the address form stays for ad-hoc lookups.
 router.get('/pin/:pinId/enrich', auth('ANY'), CanvassControllers.enrichPin);
+// Skip-trace a door for resident name + phone + email (cached).
+router.get('/pin/:pinId/contact', auth('ANY'), CanvassControllers.contactPin);
 router.get('/:orgId/enrich', auth('ANY'), CanvassControllers.enrich);
 
 // Territories (drawn areas assigned to reps).
