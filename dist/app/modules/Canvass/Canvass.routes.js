@@ -13,5 +13,7 @@ const router = express_1.default.Router();
 router.post('/:orgId/pin', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.createPin);
 router.get('/:orgId/pins', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.listPins);
 router.patch('/pin/:pinId', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.updatePin);
+// Assign/reassign a lead to a rep (admin only, enforced in the service).
+router.patch('/pin/:pinId/assign', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.assignPin);
 router.delete('/pin/:pinId', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.deletePin);
 exports.CanvassRoutes = router;

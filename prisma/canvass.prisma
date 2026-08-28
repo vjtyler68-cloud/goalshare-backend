@@ -15,6 +15,12 @@ model CanvassPin {
     state   String @default("")
     zip     String @default("")
 
+    // Optional lead assignment: the admin can hand a door to a specific rep.
+    // A rep sees pins they dropped (repId) OR ones assigned to them
+    // (assignedRepId) — see listPins.
+    assignedRepId   String? @db.ObjectId
+    assignedRepName String?
+
     status        String // status code (APPT, NH, SLR, SALE, …)
     statusHistory String? // JSON: [{status, at, repId}]
 

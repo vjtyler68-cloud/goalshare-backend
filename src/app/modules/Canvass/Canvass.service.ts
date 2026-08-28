@@ -36,6 +36,8 @@ const shapePin = (p: any) => {
     city: p.city,
     state: p.state,
     zip: p.zip,
+    assignedRepId: p.assignedRepId ?? null,
+    assignedRepName: p.assignedRepName ?? null,
     status: p.status,
     statusHistory: history,
     homeownerName: p.homeownerName,
@@ -87,11 +89,16 @@ const createPin = async (userId: string, orgId: string, body: any) => {
   return shapePin(pin);
 };
 
-/** List pins for an org. Admin → all; rep → only their own (server-enforced). */
+/**
+ * List pins for an org. Admin → all; a rep → pins they dropped (repId) OR pins
+ * the admin assigned to them (assignedRepId). Server-enforced.
+ */
 const listPins = async (userId: string, orgId: string) => {
   const m = await assertMember(userId, orgId);
   const where: any = { orgId };
-  if (m.role !== 'admin') where.repId = userId;
+  if (m.role !== 'admin') {
+    where.OR = [{ repId: userId }, { assignedRepId: userId }];
+  }
   const pins = await prisma.canvassPin.findMany({
     where,
     orderBy: { updatedAt: 'desc' },
@@ -153,6 +160,67 @@ const updatePin = async (userId: string, pinId: string, body: any) => {
   return shapePin(updated);
 };
 
+/**
+ * Assign (or unassign) a pin to a rep — admin only. An empty `repId` clears the
+ * assignment. The target must be an active member of the pin's org.
+ */
+const assignPin = async (userId: string, pinId: string, body: any) => {
+  if (!pinId || !OID.test(pinId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad pin id.');
+  }
+  const pin = await prisma.canvassPin.findUnique({ where: { id: pinId } });
+  if (!pin) throw new AppError(httpStatus.NOT_FOUND, 'Pin not found.');
+
+  const m = await membershipIn(userId, pin.orgId);
+  if (m?.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Only an admin can assign leads.');
+  }
+
+  const repId = (body?.repId ?? '').toString().trim();
+
+  // Empty repId → clear the assignment.
+  if (!repId) {
+    const cleared = await prisma.canvassPin.update({
+      where: { id: pinId },
+      data: {
+        assignedRepId: null,
+        assignedRepName: null,
+        updatedAt: new Date(),
+      },
+    });
+    return shapePin(cleared);
+  }
+
+  if (!OID.test(repId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad rep id.');
+  }
+
+  // The target must be an active member of the same org.
+  const target = await prisma.orgMembership.findFirst({
+    where: { orgId: pin.orgId, userId: repId, active: true },
+  });
+  if (!target) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'That rep is not on this team.');
+  }
+
+  const repUser = await prisma.user.findUnique({
+    where: { id: repId },
+    select: { fullName: true },
+  });
+  const repName =
+    (body?.repName ?? '').toString().trim() || repUser?.fullName || 'Rep';
+
+  const updated = await prisma.canvassPin.update({
+    where: { id: pinId },
+    data: {
+      assignedRepId: repId,
+      assignedRepName: repName,
+      updatedAt: new Date(),
+    },
+  });
+  return shapePin(updated);
+};
+
 const deletePin = async (userId: string, pinId: string) => {
   if (!pinId || !OID.test(pinId)) return { ok: true };
   const pin = await prisma.canvassPin.findUnique({ where: { id: pinId } });
@@ -168,5 +236,6 @@ export const CanvassServices = {
   createPin,
   listPins,
   updatePin,
+  assignPin,
   deletePin,
 };

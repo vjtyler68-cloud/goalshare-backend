@@ -30,11 +30,12 @@ const assertMember = (userId, orgId) => __awaiter(void 0, void 0, void 0, functi
     return m;
 });
 const shapePin = (p) => {
+    var _a, _b;
     let history = [];
     try {
         history = p.statusHistory ? JSON.parse(p.statusHistory) : [];
     }
-    catch (_a) {
+    catch (_c) {
         history = [];
     }
     return {
@@ -48,6 +49,8 @@ const shapePin = (p) => {
         city: p.city,
         state: p.state,
         zip: p.zip,
+        assignedRepId: (_a = p.assignedRepId) !== null && _a !== void 0 ? _a : null,
+        assignedRepName: (_b = p.assignedRepName) !== null && _b !== void 0 ? _b : null,
         status: p.status,
         statusHistory: history,
         homeownerName: p.homeownerName,
@@ -98,12 +101,16 @@ const createPin = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, fun
     });
     return shapePin(pin);
 });
-/** List pins for an org. Admin → all; rep → only their own (server-enforced). */
+/**
+ * List pins for an org. Admin → all; a rep → pins they dropped (repId) OR pins
+ * the admin assigned to them (assignedRepId). Server-enforced.
+ */
 const listPins = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* () {
     const m = yield assertMember(userId, orgId);
     const where = { orgId };
-    if (m.role !== 'admin')
-        where.repId = userId;
+    if (m.role !== 'admin') {
+        where.OR = [{ repId: userId }, { assignedRepId: userId }];
+    }
     const pins = yield prisma.canvassPin.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
@@ -167,6 +174,60 @@ const updatePin = (userId, pinId, body) => __awaiter(void 0, void 0, void 0, fun
     });
     return shapePin(updated);
 });
+/**
+ * Assign (or unassign) a pin to a rep — admin only. An empty `repId` clears the
+ * assignment. The target must be an active member of the pin's org.
+ */
+const assignPin = (userId, pinId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    if (!pinId || !OID.test(pinId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad pin id.');
+    }
+    const pin = yield prisma.canvassPin.findUnique({ where: { id: pinId } });
+    if (!pin)
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Pin not found.');
+    const m = yield membershipIn(userId, pin.orgId);
+    if ((m === null || m === void 0 ? void 0 : m.role) !== 'admin') {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Only an admin can assign leads.');
+    }
+    const repId = ((_a = body === null || body === void 0 ? void 0 : body.repId) !== null && _a !== void 0 ? _a : '').toString().trim();
+    // Empty repId → clear the assignment.
+    if (!repId) {
+        const cleared = yield prisma.canvassPin.update({
+            where: { id: pinId },
+            data: {
+                assignedRepId: null,
+                assignedRepName: null,
+                updatedAt: new Date(),
+            },
+        });
+        return shapePin(cleared);
+    }
+    if (!OID.test(repId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad rep id.');
+    }
+    // The target must be an active member of the same org.
+    const target = yield prisma.orgMembership.findFirst({
+        where: { orgId: pin.orgId, userId: repId, active: true },
+    });
+    if (!target) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'That rep is not on this team.');
+    }
+    const repUser = yield prisma.user.findUnique({
+        where: { id: repId },
+        select: { fullName: true },
+    });
+    const repName = ((_b = body === null || body === void 0 ? void 0 : body.repName) !== null && _b !== void 0 ? _b : '').toString().trim() || (repUser === null || repUser === void 0 ? void 0 : repUser.fullName) || 'Rep';
+    const updated = yield prisma.canvassPin.update({
+        where: { id: pinId },
+        data: {
+            assignedRepId: repId,
+            assignedRepName: repName,
+            updatedAt: new Date(),
+        },
+    });
+    return shapePin(updated);
+});
 const deletePin = (userId, pinId) => __awaiter(void 0, void 0, void 0, function* () {
     if (!pinId || !OID.test(pinId))
         return { ok: true };
@@ -183,5 +244,6 @@ exports.CanvassServices = {
     createPin,
     listPins,
     updatePin,
+    assignPin,
     deletePin,
 };

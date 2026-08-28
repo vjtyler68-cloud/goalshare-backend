@@ -42,6 +42,20 @@ const updatePin = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const assignPin = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.assignPin(
+    req.user.id,
+    req.params.pinId,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Lead assigned',
+    data: result,
+  });
+});
+
 const deletePin = catchAsync(async (req: Request, res: Response) => {
   const result = await CanvassServices.deletePin(req.user.id, req.params.pinId);
   sendResponse(res, {
@@ -56,5 +70,6 @@ export const CanvassControllers = {
   createPin,
   listPins,
   updatePin,
+  assignPin,
   deletePin,
 };
