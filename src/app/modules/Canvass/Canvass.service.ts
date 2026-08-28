@@ -43,6 +43,14 @@ const shapePin = (p: any) => {
     homeownerName: p.homeownerName,
     notes: p.notes,
     phone: p.phone,
+    enrichment: (() => {
+      try {
+        return p.enrichment ? JSON.parse(p.enrichment) : null;
+      } catch {
+        return null;
+      }
+    })(),
+    enrichedAt: p.enrichedAt ?? null,
     visitCount: p.visitCount,
     lastVisited: p.lastVisited,
     createdAt: p.createdAt,
@@ -454,6 +462,135 @@ const enrichAddress = async (
   }
 };
 
+/**
+ * Enrich a specific pin's address, CACHED on the pin so a given door only ever
+ * costs one provider lookup. `estimate` adds the market-value (AVM) call — kept
+ * separate so the cheap default is a single property-records call.
+ */
+const enrichPin = async (
+  userId: string,
+  pinId: string,
+  estimate: boolean,
+) => {
+  if (!pinId || !OID.test(pinId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad pin id.');
+  }
+  const pin = await prisma.canvassPin.findUnique({ where: { id: pinId } });
+  if (!pin) throw new AppError(httpStatus.NOT_FOUND, 'Pin not found.');
+  await assertMember(userId, pin.orgId);
+
+  const key = process.env.RENTCAST_API_KEY;
+  if (!key) return { configured: false, found: false, data: null, cached: false };
+
+  let cached: any = null;
+  try {
+    cached = pin.enrichment ? JSON.parse(pin.enrichment) : null;
+  } catch {
+    cached = null;
+  }
+  const lookedUp = !!pin.enrichedAt;
+  const needProps = !lookedUp; // property facts only fetched the first time
+  const needAvm = estimate && (!cached || cached.estimatedValue == null);
+
+  // Fully served from cache — no provider call, no charge.
+  if (!needProps && !needAvm) {
+    return { configured: true, found: !!cached, data: cached, cached: true };
+  }
+
+  const addr = [pin.address, pin.city, pin.state, pin.zip]
+    .filter((s) => (s || '').trim())
+    .join(', ');
+  if (!addr) throw new AppError(httpStatus.BAD_REQUEST, 'Pin has no address.');
+
+  const doFetch: any = (globalThis as any).fetch;
+  const hdr = { headers: { 'X-Api-Key': key, accept: 'application/json' } };
+  const enc = encodeURIComponent(addr);
+  let data: any = cached;
+
+  if (needProps) {
+    try {
+      const r = await doFetch(
+        `https://api.rentcast.io/v1/properties?address=${enc}`,
+        hdr,
+      );
+      if (r.ok) {
+        const j = await r.json();
+        const rec = Array.isArray(j) ? j[0] : j;
+        if (rec) {
+          data = {
+            address: rec.formattedAddress ?? addr,
+            owner: ownerName(rec),
+            ownerOccupied: rec.ownerOccupied ?? null,
+            yearBuilt: rec.yearBuilt ?? null,
+            squareFootage: rec.squareFootage ?? null,
+            lotSize: rec.lotSize ?? null,
+            bedrooms: rec.bedrooms ?? null,
+            bathrooms: rec.bathrooms ?? null,
+            propertyType: rec.propertyType ?? null,
+            lastSalePrice: rec.lastSalePrice ?? null,
+            lastSaleDate: rec.lastSaleDate ?? null,
+            assessedValue: latestAssessedValue(rec),
+            estimatedValue: cached?.estimatedValue ?? null,
+            estimatedValueLow: cached?.estimatedValueLow ?? null,
+            estimatedValueHigh: cached?.estimatedValueHigh ?? null,
+          };
+        }
+      }
+    } catch {
+      /* leave data as-is */
+    }
+  }
+
+  if (needAvm) {
+    try {
+      const r = await doFetch(
+        `https://api.rentcast.io/v1/avm/value?address=${enc}`,
+        hdr,
+      );
+      if (r.ok) {
+        const avm = await r.json();
+        if (avm && typeof avm.price === 'number') {
+          data = data ?? {
+            address: addr,
+            owner: '',
+            ownerOccupied: null,
+            yearBuilt: null,
+            squareFootage: null,
+            lotSize: null,
+            bedrooms: null,
+            bathrooms: null,
+            propertyType: avm.subjectProperty?.propertyType ?? null,
+            lastSalePrice: null,
+            lastSaleDate: null,
+            assessedValue: null,
+            estimatedValue: null,
+            estimatedValueLow: null,
+            estimatedValueHigh: null,
+          };
+          data.estimatedValue = avm.price;
+          data.estimatedValueLow =
+            typeof avm.priceRangeLow === 'number' ? avm.priceRangeLow : null;
+          data.estimatedValueHigh =
+            typeof avm.priceRangeHigh === 'number' ? avm.priceRangeHigh : null;
+        }
+      }
+    } catch {
+      /* leave data as-is */
+    }
+  }
+
+  // Persist — mark enrichedAt either way so we never re-charge for this door.
+  await prisma.canvassPin.update({
+    where: { id: pinId },
+    data: {
+      enrichment: data ? JSON.stringify(data) : null,
+      enrichedAt: new Date(),
+    },
+  });
+
+  return { configured: true, found: !!data, data: data ?? null, cached: false };
+};
+
 export const CanvassServices = {
   createPin,
   listPins,
@@ -465,4 +602,5 @@ export const CanvassServices = {
   updateTerritory,
   deleteTerritory,
   enrichAddress,
+  enrichPin,
 };

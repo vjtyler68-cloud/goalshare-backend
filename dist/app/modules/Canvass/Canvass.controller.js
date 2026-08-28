@@ -112,6 +112,16 @@ const enrich = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0,
         data: result,
     });
 }));
+const enrichPin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const estimate = req.query.estimate === 'true' || req.query.estimate === '1';
+    const result = yield Canvass_service_1.CanvassServices.enrichPin(req.user.id, req.params.pinId, estimate);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Property detail',
+        data: result,
+    });
+}));
 exports.CanvassControllers = {
     createPin,
     listPins,
@@ -123,4 +133,5 @@ exports.CanvassControllers = {
     updateTerritory,
     deleteTerritory,
     enrich,
+    enrichPin,
 };

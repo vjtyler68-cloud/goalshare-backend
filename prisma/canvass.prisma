@@ -28,6 +28,12 @@ model CanvassPin {
     notes         String?
     phone         String?
 
+    // Cached home + owner enrichment (JSON) so a given door is only ever looked
+    // up once against the paid data provider. enrichedAt marks that a lookup was
+    // attempted (even if no record was found) so we never re-charge for it.
+    enrichment String?
+    enrichedAt DateTime?
+
     visitCount  Int      @default(1)
     lastVisited DateTime @default(now())
 

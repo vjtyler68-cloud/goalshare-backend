@@ -16,7 +16,9 @@ router.patch('/pin/:pinId', (0, auth_1.default)('ANY'), Canvass_controller_1.Can
 // Assign/reassign a lead to a rep (admin only, enforced in the service).
 router.patch('/pin/:pinId/assign', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.assignPin);
 router.delete('/pin/:pinId', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.deletePin);
-// Property enrichment (home + owner detail for an address).
+// Property enrichment. Pin-based is CACHED (one paid lookup per door, ever) and
+// on-demand; the address form stays for ad-hoc lookups.
+router.get('/pin/:pinId/enrich', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.enrichPin);
 router.get('/:orgId/enrich', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.enrich);
 // Territories (drawn areas assigned to reps).
 router.post('/:orgId/territory', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.createTerritory);

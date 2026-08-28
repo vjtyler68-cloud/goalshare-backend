@@ -134,6 +134,21 @@ const enrich = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const enrichPin = catchAsync(async (req: Request, res: Response) => {
+  const estimate = req.query.estimate === 'true' || req.query.estimate === '1';
+  const result = await CanvassServices.enrichPin(
+    req.user.id,
+    req.params.pinId,
+    estimate,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Property detail',
+    data: result,
+  });
+});
+
 export const CanvassControllers = {
   createPin,
   listPins,
@@ -145,4 +160,5 @@ export const CanvassControllers = {
   updateTerritory,
   deleteTerritory,
   enrich,
+  enrichPin,
 };

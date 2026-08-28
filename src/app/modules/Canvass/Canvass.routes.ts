@@ -13,7 +13,9 @@ router.patch('/pin/:pinId', auth('ANY'), CanvassControllers.updatePin);
 router.patch('/pin/:pinId/assign', auth('ANY'), CanvassControllers.assignPin);
 router.delete('/pin/:pinId', auth('ANY'), CanvassControllers.deletePin);
 
-// Property enrichment (home + owner detail for an address).
+// Property enrichment. Pin-based is CACHED (one paid lookup per door, ever) and
+// on-demand; the address form stays for ad-hoc lookups.
+router.get('/pin/:pinId/enrich', auth('ANY'), CanvassControllers.enrichPin);
 router.get('/:orgId/enrich', auth('ANY'), CanvassControllers.enrich);
 
 // Territories (drawn areas assigned to reps).
