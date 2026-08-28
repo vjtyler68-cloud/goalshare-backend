@@ -7,6 +7,8 @@ const router = express.Router();
 // All membership-enforced in the service layer (admin → all org pins,
 // rep → only their own).
 router.post('/:orgId/pin', auth('ANY'), CanvassControllers.createPin);
+// Pre-load a pin on every home in an area (admin).
+router.post('/:orgId/seed-area', auth('ANY'), CanvassControllers.seedArea);
 router.get('/:orgId/pins', auth('ANY'), CanvassControllers.listPins);
 router.patch('/pin/:pinId', auth('ANY'), CanvassControllers.updatePin);
 // Assign/reassign a lead to a rep (admin only, enforced in the service).

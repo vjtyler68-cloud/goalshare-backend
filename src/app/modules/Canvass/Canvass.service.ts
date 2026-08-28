@@ -56,6 +56,7 @@ const shapePin = (p: any) => {
     assignedRepName: p.assignedRepName ?? null,
     status: p.status,
     stage: p.stage ?? 'lead',
+    seeded: p.seeded ?? false,
     statusHistory: parseJson(p.statusHistory, []),
     homeownerName: p.homeownerName,
     contactEmail: p.contactEmail ?? null,
@@ -128,12 +129,18 @@ const listPins = async (userId: string, orgId: string) => {
   const m = await assertMember(userId, orgId);
   const where: any = { orgId };
   if (m.role !== 'admin') {
-    where.OR = [{ repId: userId }, { assignedRepId: userId }];
+    // Reps see their own drops, ones assigned to them, AND all shared
+    // pre-loaded prospect pins (the "every home is a pin" territory map).
+    where.OR = [
+      { repId: userId },
+      { assignedRepId: userId },
+      { seeded: true },
+    ];
   }
   const pins = await prisma.canvassPin.findMany({
     where,
     orderBy: { updatedAt: 'desc' },
-    take: 5000,
+    take: 8000,
   });
   return pins.map(shapePin);
 };
@@ -222,6 +229,11 @@ const updatePin = async (userId: string, pinId: string, body: any) => {
     data.statusHistory = JSON.stringify(history.slice(-100));
     data.visitCount = (pin.visitCount ?? 1) + 1;
     data.lastVisited = new Date();
+    // A rep working a shared pre-loaded home claims it (leaderboard credit).
+    if (pin.seeded && newStatus !== 'NV') {
+      data.repId = userId;
+      data.repName = actor?.fullName || pin.repName;
+    }
     // Auto-advance the funnel when a sale is logged (unless stage set explicitly).
     if (
       ['SALE', 'WON', 'CS'].includes(newStatus) &&
@@ -665,6 +677,106 @@ const enrichPin = async (
   return { configured: true, found: !!data, data: data ?? null, cached: false };
 };
 
+/**
+ * Pre-load a pin on every home in an area (SalesRabbit-style territory map).
+ * Pulls parcels from the property provider around a point, dedupes against
+ * existing pins, and creates shared "Not Visited" prospect pins. Admin only.
+ */
+const seedArea = async (userId: string, orgId: string, body: any) => {
+  const m = await membershipIn(userId, orgId);
+  if (m?.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Only an admin can load homes.');
+  }
+  const key = process.env.RENTCAST_API_KEY;
+  if (!key) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Property-data key not set.');
+  }
+  const lat = Number(body?.lat);
+  const lng = Number(body?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'lat/lng required.');
+  }
+  const radius = Math.min(Math.max(Number(body?.radius) || 0.75, 0.1), 3);
+
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { fullName: true },
+  });
+  const doFetch: any = (globalThis as any).fetch;
+  const url = `https://api.rentcast.io/v1/properties?latitude=${lat}&longitude=${lng}&radius=${radius}&limit=500`;
+  let homes: any[] = [];
+  try {
+    const resp = await doFetch(url, {
+      headers: { 'X-Api-Key': key, accept: 'application/json' },
+    });
+    if (resp.ok) {
+      const j = await resp.json();
+      homes = Array.isArray(j) ? j : [];
+    }
+  } catch {
+    homes = [];
+  }
+  if (!homes.length) return { created: 0 };
+
+  const existing = await prisma.canvassPin.findMany({
+    where: { orgId },
+    select: { address: true },
+  });
+  const seen = new Set(
+    existing.map((e) => (e.address || '').toLowerCase().trim()),
+  );
+  const now = new Date();
+  const rows: any[] = [];
+  for (const h of homes) {
+    const addr = (h.addressLine1 || h.formattedAddress || '').toString();
+    if (!addr) continue;
+    const k = addr.toLowerCase().trim();
+    if (seen.has(k)) continue;
+    if (typeof h.latitude !== 'number' || typeof h.longitude !== 'number') {
+      continue;
+    }
+    seen.add(k);
+    const enrichment = {
+      address: h.formattedAddress ?? addr,
+      owner: ownerName(h),
+      ownerOccupied: h.ownerOccupied ?? null,
+      yearBuilt: h.yearBuilt ?? null,
+      squareFootage: h.squareFootage ?? null,
+      lotSize: h.lotSize ?? null,
+      bedrooms: h.bedrooms ?? null,
+      bathrooms: h.bathrooms ?? null,
+      propertyType: h.propertyType ?? null,
+      lastSalePrice: h.lastSalePrice ?? null,
+      lastSaleDate: h.lastSaleDate ?? null,
+      assessedValue: latestAssessedValue(h),
+      estimatedValue: null,
+      estimatedValueLow: null,
+      estimatedValueHigh: null,
+    };
+    rows.push({
+      orgId,
+      repId: userId, // seeding admin; shared visibility comes from `seeded`
+      repName: me?.fullName || 'Team',
+      lat: h.latitude,
+      lng: h.longitude,
+      address: addr,
+      city: (h.city ?? '').toString(),
+      state: (h.state ?? '').toString(),
+      zip: (h.zipCode ?? '').toString(),
+      status: 'NV',
+      stage: 'lead',
+      seeded: true,
+      enrichment: JSON.stringify(enrichment),
+      enrichedAt: now,
+      visitCount: 0,
+      lastVisited: now,
+    });
+  }
+  if (!rows.length) return { created: 0 };
+  await prisma.canvassPin.createMany({ data: rows });
+  return { created: rows.length };
+};
+
 export const CanvassServices = {
   createPin,
   listPins,
@@ -677,4 +789,5 @@ export const CanvassServices = {
   deleteTerritory,
   enrichAddress,
   enrichPin,
+  seedArea,
 };

@@ -122,6 +122,16 @@ const enrichPin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
         data: result,
     });
 }));
+const seedArea = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Canvass_service_1.CanvassServices.seedArea(req.user.id, req.params.orgId, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Homes loaded',
+        data: result,
+    });
+}));
 exports.CanvassControllers = {
     createPin,
     listPins,
@@ -134,4 +144,5 @@ exports.CanvassControllers = {
     deleteTerritory,
     enrich,
     enrichPin,
+    seedArea,
 };

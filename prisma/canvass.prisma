@@ -27,6 +27,10 @@ model CanvassPin {
     // Pipeline stage (Canvass-style funnel): lead | sale | approved | installed
     stage String @default("lead")
 
+    // A pre-loaded prospect pin (every home in an area) vs a rep-dropped one.
+    // Seeded pins are shared — visible to every rep on the team.
+    seeded Boolean @default(false)
+
     homeownerName String?
     contactEmail  String?
     notes         String?

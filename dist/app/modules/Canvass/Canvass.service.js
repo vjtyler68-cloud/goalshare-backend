@@ -49,7 +49,7 @@ const parseJson = (s, fallback) => {
     }
 };
 const shapePin = (p) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     return {
         id: p.id,
         orgId: p.orgId,
@@ -65,16 +65,17 @@ const shapePin = (p) => {
         assignedRepName: (_b = p.assignedRepName) !== null && _b !== void 0 ? _b : null,
         status: p.status,
         stage: (_c = p.stage) !== null && _c !== void 0 ? _c : 'lead',
+        seeded: (_d = p.seeded) !== null && _d !== void 0 ? _d : false,
         statusHistory: parseJson(p.statusHistory, []),
         homeownerName: p.homeownerName,
-        contactEmail: (_d = p.contactEmail) !== null && _d !== void 0 ? _d : null,
+        contactEmail: (_e = p.contactEmail) !== null && _e !== void 0 ? _e : null,
         notes: p.notes,
         notesLog: parseJson(p.notesLog, []),
         phone: p.phone,
         actionItems: parseJson(p.actionItems, {}),
-        systemSizeKw: (_e = p.systemSizeKw) !== null && _e !== void 0 ? _e : null,
-        leaseRatePerMonth: (_f = p.leaseRatePerMonth) !== null && _f !== void 0 ? _f : null,
-        leaseRatePerKwh: (_g = p.leaseRatePerKwh) !== null && _g !== void 0 ? _g : null,
+        systemSizeKw: (_f = p.systemSizeKw) !== null && _f !== void 0 ? _f : null,
+        leaseRatePerMonth: (_g = p.leaseRatePerMonth) !== null && _g !== void 0 ? _g : null,
+        leaseRatePerKwh: (_h = p.leaseRatePerKwh) !== null && _h !== void 0 ? _h : null,
         enrichment: (() => {
             try {
                 return p.enrichment ? JSON.parse(p.enrichment) : null;
@@ -83,7 +84,7 @@ const shapePin = (p) => {
                 return null;
             }
         })(),
-        enrichedAt: (_h = p.enrichedAt) !== null && _h !== void 0 ? _h : null,
+        enrichedAt: (_j = p.enrichedAt) !== null && _j !== void 0 ? _j : null,
         visitCount: p.visitCount,
         lastVisited: p.lastVisited,
         createdAt: p.createdAt,
@@ -137,12 +138,18 @@ const listPins = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* 
     const m = yield assertMember(userId, orgId);
     const where = { orgId };
     if (m.role !== 'admin') {
-        where.OR = [{ repId: userId }, { assignedRepId: userId }];
+        // Reps see their own drops, ones assigned to them, AND all shared
+        // pre-loaded prospect pins (the "every home is a pin" territory map).
+        where.OR = [
+            { repId: userId },
+            { assignedRepId: userId },
+            { seeded: true },
+        ];
     }
     const pins = yield prisma.canvassPin.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
-        take: 5000,
+        take: 8000,
     });
     return pins.map(shapePin);
 });
@@ -230,6 +237,11 @@ const updatePin = (userId, pinId, body) => __awaiter(void 0, void 0, void 0, fun
         data.statusHistory = JSON.stringify(history.slice(-100));
         data.visitCount = ((_b = pin.visitCount) !== null && _b !== void 0 ? _b : 1) + 1;
         data.lastVisited = new Date();
+        // A rep working a shared pre-loaded home claims it (leaderboard credit).
+        if (pin.seeded && newStatus !== 'NV') {
+            data.repId = userId;
+            data.repName = (actor === null || actor === void 0 ? void 0 : actor.fullName) || pin.repName;
+        }
         // Auto-advance the funnel when a sale is logged (unless stage set explicitly).
         if (['SALE', 'WON', 'CS'].includes(newStatus) &&
             ((_c = pin.stage) !== null && _c !== void 0 ? _c : 'lead') === 'lead' &&
@@ -636,6 +648,107 @@ const enrichPin = (userId, pinId, estimate) => __awaiter(void 0, void 0, void 0,
     });
     return { configured: true, found: !!data, data: data !== null && data !== void 0 ? data : null, cached: false };
 });
+/**
+ * Pre-load a pin on every home in an area (SalesRabbit-style territory map).
+ * Pulls parcels from the property provider around a point, dedupes against
+ * existing pins, and creates shared "Not Visited" prospect pins. Admin only.
+ */
+const seedArea = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+    const m = yield membershipIn(userId, orgId);
+    if ((m === null || m === void 0 ? void 0 : m.role) !== 'admin') {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Only an admin can load homes.');
+    }
+    const key = process.env.RENTCAST_API_KEY;
+    if (!key) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Property-data key not set.');
+    }
+    const lat = Number(body === null || body === void 0 ? void 0 : body.lat);
+    const lng = Number(body === null || body === void 0 ? void 0 : body.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'lat/lng required.');
+    }
+    const radius = Math.min(Math.max(Number(body === null || body === void 0 ? void 0 : body.radius) || 0.75, 0.1), 3);
+    const me = yield prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullName: true },
+    });
+    const doFetch = globalThis.fetch;
+    const url = `https://api.rentcast.io/v1/properties?latitude=${lat}&longitude=${lng}&radius=${radius}&limit=500`;
+    let homes = [];
+    try {
+        const resp = yield doFetch(url, {
+            headers: { 'X-Api-Key': key, accept: 'application/json' },
+        });
+        if (resp.ok) {
+            const j = yield resp.json();
+            homes = Array.isArray(j) ? j : [];
+        }
+    }
+    catch (_p) {
+        homes = [];
+    }
+    if (!homes.length)
+        return { created: 0 };
+    const existing = yield prisma.canvassPin.findMany({
+        where: { orgId },
+        select: { address: true },
+    });
+    const seen = new Set(existing.map((e) => (e.address || '').toLowerCase().trim()));
+    const now = new Date();
+    const rows = [];
+    for (const h of homes) {
+        const addr = (h.addressLine1 || h.formattedAddress || '').toString();
+        if (!addr)
+            continue;
+        const k = addr.toLowerCase().trim();
+        if (seen.has(k))
+            continue;
+        if (typeof h.latitude !== 'number' || typeof h.longitude !== 'number') {
+            continue;
+        }
+        seen.add(k);
+        const enrichment = {
+            address: (_a = h.formattedAddress) !== null && _a !== void 0 ? _a : addr,
+            owner: ownerName(h),
+            ownerOccupied: (_b = h.ownerOccupied) !== null && _b !== void 0 ? _b : null,
+            yearBuilt: (_c = h.yearBuilt) !== null && _c !== void 0 ? _c : null,
+            squareFootage: (_d = h.squareFootage) !== null && _d !== void 0 ? _d : null,
+            lotSize: (_e = h.lotSize) !== null && _e !== void 0 ? _e : null,
+            bedrooms: (_f = h.bedrooms) !== null && _f !== void 0 ? _f : null,
+            bathrooms: (_g = h.bathrooms) !== null && _g !== void 0 ? _g : null,
+            propertyType: (_h = h.propertyType) !== null && _h !== void 0 ? _h : null,
+            lastSalePrice: (_j = h.lastSalePrice) !== null && _j !== void 0 ? _j : null,
+            lastSaleDate: (_k = h.lastSaleDate) !== null && _k !== void 0 ? _k : null,
+            assessedValue: latestAssessedValue(h),
+            estimatedValue: null,
+            estimatedValueLow: null,
+            estimatedValueHigh: null,
+        };
+        rows.push({
+            orgId,
+            repId: userId, // seeding admin; shared visibility comes from `seeded`
+            repName: (me === null || me === void 0 ? void 0 : me.fullName) || 'Team',
+            lat: h.latitude,
+            lng: h.longitude,
+            address: addr,
+            city: ((_l = h.city) !== null && _l !== void 0 ? _l : '').toString(),
+            state: ((_m = h.state) !== null && _m !== void 0 ? _m : '').toString(),
+            zip: ((_o = h.zipCode) !== null && _o !== void 0 ? _o : '').toString(),
+            status: 'NV',
+            stage: 'lead',
+            seeded: true,
+            enrichment: JSON.stringify(enrichment),
+            enrichedAt: now,
+            visitCount: 0,
+            lastVisited: now,
+        });
+    }
+    if (!rows.length)
+        return { created: 0 };
+    yield prisma.canvassPin.createMany({ data: rows });
+    return { created: rows.length };
+});
 exports.CanvassServices = {
     createPin,
     listPins,
@@ -648,4 +761,5 @@ exports.CanvassServices = {
     deleteTerritory,
     enrichAddress,
     enrichPin,
+    seedArea,
 };
