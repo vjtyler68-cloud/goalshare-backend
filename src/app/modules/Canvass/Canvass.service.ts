@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import httpStatus from 'http-status';
 import AppError from '../../errors/AppError';
+import { addressKey, inPolygon } from './Canvass.logic';
 
 const prisma = new PrismaClient();
 const OID = /^[a-f0-9]{24}$/i;
@@ -369,29 +370,6 @@ const normPoints = (raw: any): { lat: number; lng: number }[] =>
   (Array.isArray(raw) ? raw : [])
     .map((p: any) => ({ lat: Number(p?.lat), lng: Number(p?.lng) }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-
-const inPolygon = (
-  lat: number,
-  lng: number,
-  points: { lat: number; lng: number }[],
-) => {
-  let inside = false;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    const a = points[i];
-    const b = points[j];
-    const intersects =
-      a.lat > lat !== b.lat > lat &&
-      lng < ((b.lng - a.lng) * (lat - a.lat)) / (b.lat - a.lat) + a.lng;
-    if (intersects) inside = !inside;
-  }
-  return inside;
-};
-
-const addressKey = (address: string, city: string, state: string, zip: string) =>
-  [address, city, state, zip]
-    .join('|')
-    .toLowerCase()
-    .replace(/[^a-z0-9|]/g, '');
 
 const territoryReps = async (orgId: string, raw: any) => {
   const ids = [

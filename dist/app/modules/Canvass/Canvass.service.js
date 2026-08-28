@@ -16,6 +16,7 @@ exports.CanvassServices = void 0;
 const client_1 = require("@prisma/client");
 const http_status_1 = __importDefault(require("http-status"));
 const AppError_1 = __importDefault(require("../../errors/AppError"));
+const Canvass_logic_1 = require("./Canvass.logic");
 const prisma = new client_1.PrismaClient();
 const OID = /^[a-f0-9]{24}$/i;
 /** A user's active membership in an org (or null). */
@@ -366,22 +367,6 @@ const shapeTerritory = (t) => {
 const normPoints = (raw) => (Array.isArray(raw) ? raw : [])
     .map((p) => ({ lat: Number(p === null || p === void 0 ? void 0 : p.lat), lng: Number(p === null || p === void 0 ? void 0 : p.lng) }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-const inPolygon = (lat, lng, points) => {
-    let inside = false;
-    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-        const a = points[i];
-        const b = points[j];
-        const intersects = a.lat > lat !== b.lat > lat &&
-            lng < ((b.lng - a.lng) * (lat - a.lat)) / (b.lat - a.lat) + a.lng;
-        if (intersects)
-            inside = !inside;
-    }
-    return inside;
-};
-const addressKey = (address, city, state, zip) => [address, city, state, zip]
-    .join('|')
-    .toLowerCase()
-    .replace(/[^a-z0-9|]/g, '');
 const territoryReps = (orgId, raw) => __awaiter(void 0, void 0, void 0, function* () {
     const ids = [
         ...new Set((Array.isArray(raw) ? raw : [])
@@ -593,7 +578,7 @@ const populateTerritory = (userId, territoryId, body) => __awaiter(void 0, void 
             where: { orgId: territory.orgId },
             select: { address: true, city: true, state: true, zip: true },
         });
-        const seen = new Set(existing.map((p) => addressKey(p.address, p.city, p.state, p.zip)));
+        const seen = new Set(existing.map((p) => (0, Canvass_logic_1.addressKey)(p.address, p.city, p.state, p.zip)));
         const creator = yield prisma.user.findUnique({
             where: { id: userId },
             select: { fullName: true },
@@ -611,11 +596,11 @@ const populateTerritory = (userId, territoryId, body) => __awaiter(void 0, void 
             if (!address ||
                 !Number.isFinite(homeLat) ||
                 !Number.isFinite(homeLng) ||
-                !inPolygon(homeLat, homeLng, points)) {
+                !(0, Canvass_logic_1.inPolygon)(homeLat, homeLng, points)) {
                 skipped++;
                 continue;
             }
-            const dedupe = addressKey(address, city, state, zip);
+            const dedupe = (0, Canvass_logic_1.addressKey)(address, city, state, zip);
             if (seen.has(dedupe)) {
                 skipped++;
                 continue;
