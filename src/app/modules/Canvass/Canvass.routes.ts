@@ -30,6 +30,11 @@ router.patch(
   auth('ANY'),
   CanvassControllers.updateTerritory,
 );
+router.post(
+  '/territory/:territoryId/populate',
+  auth('ANY'),
+  CanvassControllers.populateTerritory,
+);
 router.delete(
   '/territory/:territoryId',
   auth('ANY'),

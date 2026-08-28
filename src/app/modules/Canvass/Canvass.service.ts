@@ -54,6 +54,7 @@ const shapePin = (p: any) => {
     zip: p.zip,
     assignedRepId: p.assignedRepId ?? null,
     assignedRepName: p.assignedRepName ?? null,
+    territoryId: p.territoryId ?? null,
     status: p.status,
     stage: p.stage ?? 'lead',
     seeded: p.seeded ?? false,
@@ -131,12 +132,12 @@ const listPins = async (userId: string, orgId: string) => {
   const m = await assertMember(userId, orgId);
   const where: any = { orgId };
   if (m.role !== 'admin') {
-    // Reps see their own drops, ones assigned to them, AND all shared
-    // pre-loaded prospect pins (the "every home is a pin" territory map).
+    // Least privilege: reps see only their own drops or explicitly assigned
+    // doors. Territory population assigns every created door to one of the
+    // territory reps; unassigned territory doors remain admin-only.
     where.OR = [
       { repId: userId },
       { assignedRepId: userId },
-      { seeded: true },
     ];
   }
   const pins = await prisma.canvassPin.findMany({
@@ -148,7 +149,7 @@ const listPins = async (userId: string, orgId: string) => {
 };
 
 const canEdit = async (userId: string, pin: any) => {
-  if (pin.repId === userId) return true;
+  if (pin.repId === userId || pin.assignedRepId === userId) return true;
   const m = await membershipIn(userId, pin.orgId);
   return m?.role === 'admin';
 };
@@ -353,6 +354,11 @@ const shapeTerritory = (t: any) => {
     points,
     assignedRepIds: t.assignedRepIds ?? [],
     assignedRepNames: t.assignedRepNames ?? [],
+    populationState: t.populationState ?? 'idle',
+    populationCreated: t.populationCreated ?? 0,
+    populationSkipped: t.populationSkipped ?? 0,
+    populationError: t.populationError ?? null,
+    populatedAt: t.populatedAt ?? null,
     createdBy: t.createdBy,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
@@ -363,6 +369,29 @@ const normPoints = (raw: any): { lat: number; lng: number }[] =>
   (Array.isArray(raw) ? raw : [])
     .map((p: any) => ({ lat: Number(p?.lat), lng: Number(p?.lng) }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+
+const inPolygon = (
+  lat: number,
+  lng: number,
+  points: { lat: number; lng: number }[],
+) => {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i];
+    const b = points[j];
+    const intersects =
+      a.lat > lat !== b.lat > lat &&
+      lng < ((b.lng - a.lng) * (lat - a.lat)) / (b.lat - a.lat) + a.lng;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+};
+
+const addressKey = (address: string, city: string, state: string, zip: string) =>
+  [address, city, state, zip]
+    .join('|')
+    .toLowerCase()
+    .replace(/[^a-z0-9|]/g, '');
 
 /** Draw a territory (admin only). Needs a polygon of >= 3 points. */
 const createTerritory = async (userId: string, orgId: string, body: any) => {
@@ -453,6 +482,152 @@ const deleteTerritory = async (userId: string, territoryId: string) => {
   await assertAdmin(userId, t.orgId);
   await prisma.canvassTerritory.delete({ where: { id: territoryId } });
   return { ok: true };
+};
+
+/**
+ * Discover address-level doors around a saved polygon, then retain only exact
+ * point-in-polygon matches. Existing org addresses are skipped, including pins
+ * created by overlapping territories. Property/contact enrichment is never
+ * performed here.
+ */
+const populateTerritory = async (
+  userId: string,
+  territoryId: string,
+  body: any,
+) => {
+  if (!territoryId || !OID.test(territoryId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad territory id.');
+  }
+  const territory = await prisma.canvassTerritory.findUnique({
+    where: { id: territoryId },
+  });
+  if (!territory) throw new AppError(httpStatus.NOT_FOUND, 'Territory not found.');
+  await assertAdmin(userId, territory.orgId);
+  const points = normPoints(parseJson(territory.points, []));
+  if (points.length < 3) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Territory polygon is invalid.');
+  }
+  const limit = Math.min(Math.max(Number(body?.limit) || 500, 1), 1000);
+  const key = process.env.RENTCAST_API_KEY;
+  if (!key) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Property-data key not set.');
+  }
+  await prisma.canvassTerritory.update({
+    where: { id: territoryId },
+    data: { populationState: 'running', populationError: null },
+  });
+
+  try {
+    const minLat = Math.min(...points.map((p) => p.lat));
+    const maxLat = Math.max(...points.map((p) => p.lat));
+    const minLng = Math.min(...points.map((p) => p.lng));
+    const maxLng = Math.max(...points.map((p) => p.lng));
+    const lat = (minLat + maxLat) / 2;
+    const lng = (minLng + maxLng) / 2;
+    const milesLat = (maxLat - minLat) * 69;
+    const milesLng =
+      (maxLng - minLng) * 69 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2);
+    const radius = Math.min(Math.max(Math.hypot(milesLat, milesLng) / 2, 0.1), 3);
+    const doFetch: any = (globalThis as any).fetch;
+    const url =
+      `https://api.rentcast.io/v1/properties?latitude=${lat}` +
+      `&longitude=${lng}&radius=${radius}&limit=${limit}`;
+    const response = await doFetch(url, {
+      headers: { 'X-Api-Key': key, accept: 'application/json' },
+    });
+    if (!response.ok) {
+      throw new AppError(
+        response.status === 429
+          ? httpStatus.TOO_MANY_REQUESTS
+          : httpStatus.BAD_GATEWAY,
+        response.status === 429
+          ? 'Property provider limit reached. Retry later.'
+          : 'Property provider unavailable.',
+      );
+    }
+    const payload = await response.json();
+    const homes = Array.isArray(payload) ? payload : [];
+    const existing = await prisma.canvassPin.findMany({
+      where: { orgId: territory.orgId },
+      select: { address: true, city: true, state: true, zip: true },
+    });
+    const seen = new Set(
+      existing.map((p) => addressKey(p.address, p.city, p.state, p.zip)),
+    );
+    const creator = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true },
+    });
+    const rows: any[] = [];
+    let skipped = 0;
+    let assignmentIndex = 0;
+    for (const home of homes) {
+      const homeLat = Number(home?.latitude);
+      const homeLng = Number(home?.longitude);
+      const address = (home?.addressLine1 || home?.formattedAddress || '').toString();
+      const city = (home?.city || '').toString();
+      const state = (home?.state || '').toString();
+      const zip = (home?.zipCode || '').toString();
+      if (
+        !address ||
+        !Number.isFinite(homeLat) ||
+        !Number.isFinite(homeLng) ||
+        !inPolygon(homeLat, homeLng, points)
+      ) {
+        skipped++;
+        continue;
+      }
+      const dedupe = addressKey(address, city, state, zip);
+      if (seen.has(dedupe)) {
+        skipped++;
+        continue;
+      }
+      seen.add(dedupe);
+      const repCount = territory.assignedRepIds.length;
+      const repOffset = repCount ? assignmentIndex++ % repCount : -1;
+      rows.push({
+        orgId: territory.orgId,
+        territoryId,
+        repId: userId,
+        repName: creator?.fullName || 'Team',
+        assignedRepId: repOffset >= 0 ? territory.assignedRepIds[repOffset] : null,
+        assignedRepName:
+          repOffset >= 0 ? territory.assignedRepNames[repOffset] || 'Rep' : null,
+        lat: homeLat,
+        lng: homeLng,
+        address,
+        city,
+        state,
+        zip,
+        status: 'NV',
+        stage: 'lead',
+        seeded: true,
+        visitCount: 0,
+        lastVisited: new Date(),
+      });
+    }
+    if (rows.length) await prisma.canvassPin.createMany({ data: rows });
+    const updated = await prisma.canvassTerritory.update({
+      where: { id: territoryId },
+      data: {
+        populationState: 'complete',
+        populationCreated: { increment: rows.length },
+        populationSkipped: { increment: skipped },
+        populationError: null,
+        populatedAt: new Date(),
+      },
+    });
+    return { territory: shapeTerritory(updated), created: rows.length, skipped };
+  } catch (error: any) {
+    await prisma.canvassTerritory.update({
+      where: { id: territoryId },
+      data: {
+        populationState: 'failed',
+        populationError: (error?.message || 'Population failed.').slice(0, 200),
+      },
+    });
+    throw error;
+  }
 };
 
 // ── Property enrichment (home + owner details) ──────────────────────────────
@@ -566,6 +741,9 @@ const enrichPin = async (
   const pin = await prisma.canvassPin.findUnique({ where: { id: pinId } });
   if (!pin) throw new AppError(httpStatus.NOT_FOUND, 'Pin not found.');
   await assertMember(userId, pin.orgId);
+  if (!(await canEdit(userId, pin))) {
+    throw new AppError(httpStatus.FORBIDDEN, 'Not allowed to view this household.');
+  }
 
   const key = process.env.RENTCAST_API_KEY;
   if (!key) return { configured: false, found: false, data: null, cached: false };
@@ -791,6 +969,9 @@ const contactPin = async (userId: string, pinId: string) => {
   const pin = await prisma.canvassPin.findUnique({ where: { id: pinId } });
   if (!pin) throw new AppError(httpStatus.NOT_FOUND, 'Pin not found.');
   await assertMember(userId, pin.orgId);
+  if (!(await canEdit(userId, pin))) {
+    throw new AppError(httpStatus.FORBIDDEN, 'Not allowed to view this household.');
+  }
 
   // Served from cache — no provider call, no charge.
   if (pin.contactAt) {
@@ -885,6 +1066,7 @@ export const CanvassServices = {
   listTerritories,
   updateTerritory,
   deleteTerritory,
+  populateTerritory,
   enrichAddress,
   enrichPin,
   seedArea,

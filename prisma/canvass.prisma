@@ -20,6 +20,7 @@ model CanvassPin {
     // (assignedRepId) — see listPins.
     assignedRepId   String? @db.ObjectId
     assignedRepName String?
+    territoryId     String? @db.ObjectId
 
     status        String // status code (APPT, NH, SLR, SALE, …)
     statusHistory String? // JSON: [{status, at, repId}]
@@ -80,6 +81,12 @@ model CanvassTerritory {
     // Parallel arrays of the reps this area is assigned to (multi-assign).
     assignedRepIds   String[]
     assignedRepNames String[]
+
+    populationState String @default("idle")
+    populationCreated Int @default(0)
+    populationSkipped Int @default(0)
+    populationError String?
+    populatedAt DateTime?
 
     createdBy String   @db.ObjectId
     createdAt DateTime @default(now())
