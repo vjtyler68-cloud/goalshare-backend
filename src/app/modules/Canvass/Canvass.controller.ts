@@ -120,6 +120,20 @@ const deleteTerritory = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const enrich = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.enrichAddress(
+    req.user.id,
+    req.params.orgId,
+    (req.query.address as string) || '',
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Property detail',
+    data: result,
+  });
+});
+
 export const CanvassControllers = {
   createPin,
   listPins,
@@ -130,4 +144,5 @@ export const CanvassControllers = {
   listTerritories,
   updateTerritory,
   deleteTerritory,
+  enrich,
 };

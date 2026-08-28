@@ -359,6 +359,83 @@ const deleteTerritory = async (userId: string, territoryId: string) => {
   return { ok: true };
 };
 
+// ── Property enrichment (home + owner details) ──────────────────────────────
+// Looks up public property + assessor detail for an address via a data
+// provider. The provider key lives in an env var so it can be swapped without
+// an app release; when it's unset the app just shows a "not set up" state.
+
+const latestAssessedValue = (rec: any): number | null => {
+  const ta = rec?.taxAssessments;
+  if (!ta || typeof ta !== 'object') return null;
+  const years = Object.keys(ta).sort();
+  if (!years.length) return null;
+  const latest = ta[years[years.length - 1]];
+  const v = latest?.value;
+  return typeof v === 'number' ? v : null;
+};
+
+const ownerName = (rec: any): string => {
+  const o = rec?.owner;
+  if (!o) return '';
+  if (Array.isArray(o.names) && o.names.length) return o.names.join(' & ');
+  if (typeof o.name === 'string') return o.name;
+  return '';
+};
+
+/** Enrich an address with home + owner detail. Any org member may look up. */
+const enrichAddress = async (
+  userId: string,
+  orgId: string,
+  address: string,
+) => {
+  await assertMember(userId, orgId);
+  const key = process.env.RENTCAST_API_KEY;
+  if (!key) {
+    return { configured: false, found: false, data: null };
+  }
+  const addr = (address || '').trim();
+  if (!addr) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'address required.');
+  }
+  try {
+    const doFetch: any = (globalThis as any).fetch;
+    const url = `https://api.rentcast.io/v1/properties?address=${encodeURIComponent(
+      addr,
+    )}`;
+    const resp = await doFetch(url, {
+      headers: { 'X-Api-Key': key, accept: 'application/json' },
+    });
+    if (!resp.ok) {
+      return { configured: true, found: false, data: null };
+    }
+    const json = await resp.json();
+    const rec = Array.isArray(json) ? json[0] : json;
+    if (!rec) {
+      return { configured: true, found: false, data: null };
+    }
+    return {
+      configured: true,
+      found: true,
+      data: {
+        address: rec.formattedAddress ?? addr,
+        owner: ownerName(rec),
+        ownerOccupied: rec.ownerOccupied ?? null,
+        yearBuilt: rec.yearBuilt ?? null,
+        squareFootage: rec.squareFootage ?? null,
+        lotSize: rec.lotSize ?? null,
+        bedrooms: rec.bedrooms ?? null,
+        bathrooms: rec.bathrooms ?? null,
+        propertyType: rec.propertyType ?? null,
+        lastSalePrice: rec.lastSalePrice ?? null,
+        lastSaleDate: rec.lastSaleDate ?? null,
+        assessedValue: latestAssessedValue(rec),
+      },
+    };
+  } catch {
+    return { configured: true, found: false, data: null };
+  }
+};
+
 export const CanvassServices = {
   createPin,
   listPins,
@@ -369,4 +446,5 @@ export const CanvassServices = {
   listTerritories,
   updateTerritory,
   deleteTerritory,
+  enrichAddress,
 };

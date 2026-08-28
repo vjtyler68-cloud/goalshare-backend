@@ -359,6 +359,80 @@ const deleteTerritory = (userId, territoryId) => __awaiter(void 0, void 0, void 
     yield prisma.canvassTerritory.delete({ where: { id: territoryId } });
     return { ok: true };
 });
+// ── Property enrichment (home + owner details) ──────────────────────────────
+// Looks up public property + assessor detail for an address via a data
+// provider. The provider key lives in an env var so it can be swapped without
+// an app release; when it's unset the app just shows a "not set up" state.
+const latestAssessedValue = (rec) => {
+    const ta = rec === null || rec === void 0 ? void 0 : rec.taxAssessments;
+    if (!ta || typeof ta !== 'object')
+        return null;
+    const years = Object.keys(ta).sort();
+    if (!years.length)
+        return null;
+    const latest = ta[years[years.length - 1]];
+    const v = latest === null || latest === void 0 ? void 0 : latest.value;
+    return typeof v === 'number' ? v : null;
+};
+const ownerName = (rec) => {
+    const o = rec === null || rec === void 0 ? void 0 : rec.owner;
+    if (!o)
+        return '';
+    if (Array.isArray(o.names) && o.names.length)
+        return o.names.join(' & ');
+    if (typeof o.name === 'string')
+        return o.name;
+    return '';
+};
+/** Enrich an address with home + owner detail. Any org member may look up. */
+const enrichAddress = (userId, orgId, address) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    yield assertMember(userId, orgId);
+    const key = process.env.RENTCAST_API_KEY;
+    if (!key) {
+        return { configured: false, found: false, data: null };
+    }
+    const addr = (address || '').trim();
+    if (!addr) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'address required.');
+    }
+    try {
+        const doFetch = globalThis.fetch;
+        const url = `https://api.rentcast.io/v1/properties?address=${encodeURIComponent(addr)}`;
+        const resp = yield doFetch(url, {
+            headers: { 'X-Api-Key': key, accept: 'application/json' },
+        });
+        if (!resp.ok) {
+            return { configured: true, found: false, data: null };
+        }
+        const json = yield resp.json();
+        const rec = Array.isArray(json) ? json[0] : json;
+        if (!rec) {
+            return { configured: true, found: false, data: null };
+        }
+        return {
+            configured: true,
+            found: true,
+            data: {
+                address: (_a = rec.formattedAddress) !== null && _a !== void 0 ? _a : addr,
+                owner: ownerName(rec),
+                ownerOccupied: (_b = rec.ownerOccupied) !== null && _b !== void 0 ? _b : null,
+                yearBuilt: (_c = rec.yearBuilt) !== null && _c !== void 0 ? _c : null,
+                squareFootage: (_d = rec.squareFootage) !== null && _d !== void 0 ? _d : null,
+                lotSize: (_e = rec.lotSize) !== null && _e !== void 0 ? _e : null,
+                bedrooms: (_f = rec.bedrooms) !== null && _f !== void 0 ? _f : null,
+                bathrooms: (_g = rec.bathrooms) !== null && _g !== void 0 ? _g : null,
+                propertyType: (_h = rec.propertyType) !== null && _h !== void 0 ? _h : null,
+                lastSalePrice: (_j = rec.lastSalePrice) !== null && _j !== void 0 ? _j : null,
+                lastSaleDate: (_k = rec.lastSaleDate) !== null && _k !== void 0 ? _k : null,
+                assessedValue: latestAssessedValue(rec),
+            },
+        };
+    }
+    catch (_l) {
+        return { configured: true, found: false, data: null };
+    }
+});
 exports.CanvassServices = {
     createPin,
     listPins,
@@ -369,4 +443,5 @@ exports.CanvassServices = {
     listTerritories,
     updateTerritory,
     deleteTerritory,
+    enrichAddress,
 };
