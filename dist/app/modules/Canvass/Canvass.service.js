@@ -382,6 +382,29 @@ const addressKey = (address, city, state, zip) => [address, city, state, zip]
     .join('|')
     .toLowerCase()
     .replace(/[^a-z0-9|]/g, '');
+const territoryReps = (orgId, raw) => __awaiter(void 0, void 0, void 0, function* () {
+    const ids = [
+        ...new Set((Array.isArray(raw) ? raw : [])
+            .map((value) => value.toString())
+            .filter((value) => OID.test(value))),
+    ];
+    if (!ids.length)
+        return { ids: [], names: [] };
+    const memberships = yield prisma.orgMembership.findMany({
+        where: { orgId, userId: { in: ids }, active: true },
+        select: { userId: true },
+    });
+    const memberIds = new Set(memberships.map((membership) => membership.userId));
+    if (ids.some((id) => !memberIds.has(id))) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Every assigned rep must be an active member of this team.');
+    }
+    const users = yield prisma.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, fullName: true },
+    });
+    const namesById = new Map(users.map((user) => [user.id, user.fullName || 'Rep']));
+    return { ids, names: ids.map((id) => namesById.get(id) || 'Rep') };
+});
 /** Draw a territory (admin only). Needs a polygon of >= 3 points. */
 const createTerritory = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
     yield assertAdmin(userId, orgId);
@@ -389,20 +412,15 @@ const createTerritory = (userId, orgId, body) => __awaiter(void 0, void 0, void 
     if (points.length < 3) {
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'An area needs at least 3 points.');
     }
-    const repIds = (Array.isArray(body === null || body === void 0 ? void 0 : body.assignedRepIds) ? body.assignedRepIds : [])
-        .map((s) => s.toString())
-        .filter((s) => OID.test(s));
-    const repNames = (Array.isArray(body === null || body === void 0 ? void 0 : body.assignedRepNames)
-        ? body.assignedRepNames
-        : []).map((s) => s.toString());
+    const reps = yield territoryReps(orgId, body === null || body === void 0 ? void 0 : body.assignedRepIds);
     const t = yield prisma.canvassTerritory.create({
         data: {
             orgId,
             name: ((body === null || body === void 0 ? void 0 : body.name) || 'Territory').toString().slice(0, 60),
             color: ((body === null || body === void 0 ? void 0 : body.color) || '#F59E0B').toString().slice(0, 16),
             points: JSON.stringify(points),
-            assignedRepIds: repIds,
-            assignedRepNames: repNames,
+            assignedRepIds: reps.ids,
+            assignedRepNames: reps.names,
             createdBy: userId,
         },
     });
@@ -433,6 +451,7 @@ const updateTerritory = (userId, territoryId, body) => __awaiter(void 0, void 0,
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Territory not found.');
     yield assertAdmin(userId, t.orgId);
     const data = { updatedAt: new Date() };
+    let reps = null;
     if (typeof (body === null || body === void 0 ? void 0 : body.name) === 'string')
         data.name = body.name.slice(0, 60);
     if (typeof (body === null || body === void 0 ? void 0 : body.color) === 'string')
@@ -443,17 +462,42 @@ const updateTerritory = (userId, territoryId, body) => __awaiter(void 0, void 0,
             data.points = JSON.stringify(pts);
     }
     if (Array.isArray(body === null || body === void 0 ? void 0 : body.assignedRepIds)) {
-        data.assignedRepIds = body.assignedRepIds
-            .map((s) => s.toString())
-            .filter((s) => OID.test(s));
+        reps = yield territoryReps(t.orgId, body.assignedRepIds);
+        data.assignedRepIds = reps.ids;
+        data.assignedRepNames = reps.names;
     }
-    if (Array.isArray(body === null || body === void 0 ? void 0 : body.assignedRepNames)) {
-        data.assignedRepNames = body.assignedRepNames.map((s) => s.toString());
+    let updated;
+    if (reps == null) {
+        updated = yield prisma.canvassTerritory.update({
+            where: { id: territoryId },
+            data,
+        });
     }
-    const updated = yield prisma.canvassTerritory.update({
-        where: { id: territoryId },
-        data,
-    });
+    else {
+        const pins = yield prisma.canvassPin.findMany({
+            where: { territoryId },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true },
+        });
+        const pinUpdates = pins.map((pin, index) => {
+            const repIndex = reps.ids.length ? index % reps.ids.length : -1;
+            return prisma.canvassPin.update({
+                where: { id: pin.id },
+                data: {
+                    assignedRepId: repIndex >= 0 ? reps.ids[repIndex] : null,
+                    assignedRepName: repIndex >= 0 ? reps.names[repIndex] : null,
+                },
+            });
+        });
+        const [territory] = yield prisma.$transaction([
+            prisma.canvassTerritory.update({
+                where: { id: territoryId },
+                data,
+            }),
+            ...pinUpdates,
+        ]);
+        updated = territory;
+    }
     return shapeTerritory(updated);
 });
 const deleteTerritory = (userId, territoryId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -465,7 +509,10 @@ const deleteTerritory = (userId, territoryId) => __awaiter(void 0, void 0, void 
     if (!t)
         return { ok: true };
     yield assertAdmin(userId, t.orgId);
-    yield prisma.canvassTerritory.delete({ where: { id: territoryId } });
+    yield prisma.$transaction([
+        prisma.canvassPin.deleteMany({ where: { territoryId } }),
+        prisma.canvassTerritory.delete({ where: { id: territoryId } }),
+    ]);
     return { ok: true };
 });
 /**
