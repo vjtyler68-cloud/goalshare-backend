@@ -13,4 +13,18 @@ router.patch('/pin/:pinId', auth('ANY'), CanvassControllers.updatePin);
 router.patch('/pin/:pinId/assign', auth('ANY'), CanvassControllers.assignPin);
 router.delete('/pin/:pinId', auth('ANY'), CanvassControllers.deletePin);
 
+// Territories (drawn areas assigned to reps).
+router.post('/:orgId/territory', auth('ANY'), CanvassControllers.createTerritory);
+router.get('/:orgId/territories', auth('ANY'), CanvassControllers.listTerritories);
+router.patch(
+  '/territory/:territoryId',
+  auth('ANY'),
+  CanvassControllers.updateTerritory,
+);
+router.delete(
+  '/territory/:territoryId',
+  auth('ANY'),
+  CanvassControllers.deleteTerritory,
+);
+
 export const CanvassRoutes = router;

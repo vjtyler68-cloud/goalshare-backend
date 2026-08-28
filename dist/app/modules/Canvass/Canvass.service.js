@@ -240,10 +240,133 @@ const deletePin = (userId, pinId) => __awaiter(void 0, void 0, void 0, function*
     yield prisma.canvassPin.delete({ where: { id: pinId } });
     return { ok: true };
 });
+// ── Territories (drawn areas assigned to reps) ──────────────────────────────
+const assertAdmin = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* () {
+    const m = yield assertMember(userId, orgId);
+    if (m.role !== 'admin') {
+        throw new AppError_1.default(http_status_1.default.FORBIDDEN, 'Only an admin can do that.');
+    }
+    return m;
+});
+const shapeTerritory = (t) => {
+    var _a, _b;
+    let points = [];
+    try {
+        points = t.points ? JSON.parse(t.points) : [];
+    }
+    catch (_c) {
+        points = [];
+    }
+    return {
+        id: t.id,
+        orgId: t.orgId,
+        name: t.name,
+        color: t.color,
+        points,
+        assignedRepIds: (_a = t.assignedRepIds) !== null && _a !== void 0 ? _a : [],
+        assignedRepNames: (_b = t.assignedRepNames) !== null && _b !== void 0 ? _b : [],
+        createdBy: t.createdBy,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+    };
+};
+const normPoints = (raw) => (Array.isArray(raw) ? raw : [])
+    .map((p) => ({ lat: Number(p === null || p === void 0 ? void 0 : p.lat), lng: Number(p === null || p === void 0 ? void 0 : p.lng) }))
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+/** Draw a territory (admin only). Needs a polygon of >= 3 points. */
+const createTerritory = (userId, orgId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    yield assertAdmin(userId, orgId);
+    const points = normPoints(body === null || body === void 0 ? void 0 : body.points);
+    if (points.length < 3) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'An area needs at least 3 points.');
+    }
+    const repIds = (Array.isArray(body === null || body === void 0 ? void 0 : body.assignedRepIds) ? body.assignedRepIds : [])
+        .map((s) => s.toString())
+        .filter((s) => OID.test(s));
+    const repNames = (Array.isArray(body === null || body === void 0 ? void 0 : body.assignedRepNames)
+        ? body.assignedRepNames
+        : []).map((s) => s.toString());
+    const t = yield prisma.canvassTerritory.create({
+        data: {
+            orgId,
+            name: ((body === null || body === void 0 ? void 0 : body.name) || 'Territory').toString().slice(0, 60),
+            color: ((body === null || body === void 0 ? void 0 : body.color) || '#F59E0B').toString().slice(0, 16),
+            points: JSON.stringify(points),
+            assignedRepIds: repIds,
+            assignedRepNames: repNames,
+            createdBy: userId,
+        },
+    });
+    return shapeTerritory(t);
+});
+/** Admin → every area; a rep → only areas assigned to them. */
+const listTerritories = (userId, orgId) => __awaiter(void 0, void 0, void 0, function* () {
+    const m = yield assertMember(userId, orgId);
+    const where = { orgId };
+    if (m.role !== 'admin')
+        where.assignedRepIds = { has: userId };
+    const ts = yield prisma.canvassTerritory.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        take: 500,
+    });
+    return ts.map(shapeTerritory);
+});
+/** Rename / recolor / reshape / reassign an area (admin only). */
+const updateTerritory = (userId, territoryId, body) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!territoryId || !OID.test(territoryId)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Bad territory id.');
+    }
+    const t = yield prisma.canvassTerritory.findUnique({
+        where: { id: territoryId },
+    });
+    if (!t)
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Territory not found.');
+    yield assertAdmin(userId, t.orgId);
+    const data = { updatedAt: new Date() };
+    if (typeof (body === null || body === void 0 ? void 0 : body.name) === 'string')
+        data.name = body.name.slice(0, 60);
+    if (typeof (body === null || body === void 0 ? void 0 : body.color) === 'string')
+        data.color = body.color.slice(0, 16);
+    if (Array.isArray(body === null || body === void 0 ? void 0 : body.points)) {
+        const pts = normPoints(body.points);
+        if (pts.length >= 3)
+            data.points = JSON.stringify(pts);
+    }
+    if (Array.isArray(body === null || body === void 0 ? void 0 : body.assignedRepIds)) {
+        data.assignedRepIds = body.assignedRepIds
+            .map((s) => s.toString())
+            .filter((s) => OID.test(s));
+    }
+    if (Array.isArray(body === null || body === void 0 ? void 0 : body.assignedRepNames)) {
+        data.assignedRepNames = body.assignedRepNames.map((s) => s.toString());
+    }
+    const updated = yield prisma.canvassTerritory.update({
+        where: { id: territoryId },
+        data,
+    });
+    return shapeTerritory(updated);
+});
+const deleteTerritory = (userId, territoryId) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!territoryId || !OID.test(territoryId))
+        return { ok: true };
+    const t = yield prisma.canvassTerritory.findUnique({
+        where: { id: territoryId },
+    });
+    if (!t)
+        return { ok: true };
+    yield assertAdmin(userId, t.orgId);
+    yield prisma.canvassTerritory.delete({ where: { id: territoryId } });
+    return { ok: true };
+});
 exports.CanvassServices = {
     createPin,
     listPins,
     updatePin,
     assignPin,
     deletePin,
+    createTerritory,
+    listTerritories,
+    updateTerritory,
+    deleteTerritory,
 };

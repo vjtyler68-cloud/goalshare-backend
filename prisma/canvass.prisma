@@ -36,3 +36,28 @@ model CanvassPin {
 
     @@map("canvasspin")
 }
+
+// A drawn canvassing territory (a polygon area) an admin assigns to one or more
+// reps. Reps see the areas assigned to them; the admin sees all. Doors that
+// fall inside are computed client-side (point-in-polygon) so a rep can pull up
+// every lead in their zone with the homeowner's info.
+model CanvassTerritory {
+    id    String @id @default(auto()) @map("_id") @db.ObjectId
+    orgId String @db.ObjectId
+
+    name  String @default("Territory")
+    color String @default("#F59E0B")
+
+    // JSON: [{ "lat": n, "lng": n }, ...] — the polygon boundary (>= 3 points).
+    points String
+
+    // Parallel arrays of the reps this area is assigned to (multi-assign).
+    assignedRepIds   String[]
+    assignedRepNames String[]
+
+    createdBy String   @db.ObjectId
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("canvassterritory")
+}

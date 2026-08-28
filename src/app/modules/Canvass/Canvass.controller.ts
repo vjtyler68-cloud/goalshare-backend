@@ -66,10 +66,68 @@ const deletePin = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const createTerritory = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.createTerritory(
+    req.user.id,
+    req.params.orgId,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Territory created',
+    data: result,
+  });
+});
+
+const listTerritories = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.listTerritories(
+    req.user.id,
+    req.params.orgId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Territories',
+    data: { territories: result },
+  });
+});
+
+const updateTerritory = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.updateTerritory(
+    req.user.id,
+    req.params.territoryId,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Territory updated',
+    data: result,
+  });
+});
+
+const deleteTerritory = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.deleteTerritory(
+    req.user.id,
+    req.params.territoryId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Territory deleted',
+    data: result,
+  });
+});
+
 export const CanvassControllers = {
   createPin,
   listPins,
   updatePin,
   assignPin,
   deletePin,
+  createTerritory,
+  listTerritories,
+  updateTerritory,
+  deleteTerritory,
 };

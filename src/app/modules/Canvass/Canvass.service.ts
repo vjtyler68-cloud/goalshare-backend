@@ -232,10 +232,141 @@ const deletePin = async (userId: string, pinId: string) => {
   return { ok: true };
 };
 
+// ── Territories (drawn areas assigned to reps) ──────────────────────────────
+
+const assertAdmin = async (userId: string, orgId: string) => {
+  const m = await assertMember(userId, orgId);
+  if (m.role !== 'admin') {
+    throw new AppError(httpStatus.FORBIDDEN, 'Only an admin can do that.');
+  }
+  return m;
+};
+
+const shapeTerritory = (t: any) => {
+  let points: any[] = [];
+  try {
+    points = t.points ? JSON.parse(t.points) : [];
+  } catch {
+    points = [];
+  }
+  return {
+    id: t.id,
+    orgId: t.orgId,
+    name: t.name,
+    color: t.color,
+    points,
+    assignedRepIds: t.assignedRepIds ?? [],
+    assignedRepNames: t.assignedRepNames ?? [],
+    createdBy: t.createdBy,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+  };
+};
+
+const normPoints = (raw: any): { lat: number; lng: number }[] =>
+  (Array.isArray(raw) ? raw : [])
+    .map((p: any) => ({ lat: Number(p?.lat), lng: Number(p?.lng) }))
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+
+/** Draw a territory (admin only). Needs a polygon of >= 3 points. */
+const createTerritory = async (userId: string, orgId: string, body: any) => {
+  await assertAdmin(userId, orgId);
+  const points = normPoints(body?.points);
+  if (points.length < 3) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'An area needs at least 3 points.');
+  }
+  const repIds = (Array.isArray(body?.assignedRepIds) ? body.assignedRepIds : [])
+    .map((s: any) => s.toString())
+    .filter((s: string) => OID.test(s));
+  const repNames = (Array.isArray(body?.assignedRepNames)
+    ? body.assignedRepNames
+    : []
+  ).map((s: any) => s.toString());
+
+  const t = await prisma.canvassTerritory.create({
+    data: {
+      orgId,
+      name: (body?.name || 'Territory').toString().slice(0, 60),
+      color: (body?.color || '#F59E0B').toString().slice(0, 16),
+      points: JSON.stringify(points),
+      assignedRepIds: repIds,
+      assignedRepNames: repNames,
+      createdBy: userId,
+    },
+  });
+  return shapeTerritory(t);
+};
+
+/** Admin → every area; a rep → only areas assigned to them. */
+const listTerritories = async (userId: string, orgId: string) => {
+  const m = await assertMember(userId, orgId);
+  const where: any = { orgId };
+  if (m.role !== 'admin') where.assignedRepIds = { has: userId };
+  const ts = await prisma.canvassTerritory.findMany({
+    where,
+    orderBy: { updatedAt: 'desc' },
+    take: 500,
+  });
+  return ts.map(shapeTerritory);
+};
+
+/** Rename / recolor / reshape / reassign an area (admin only). */
+const updateTerritory = async (
+  userId: string,
+  territoryId: string,
+  body: any,
+) => {
+  if (!territoryId || !OID.test(territoryId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Bad territory id.');
+  }
+  const t = await prisma.canvassTerritory.findUnique({
+    where: { id: territoryId },
+  });
+  if (!t) throw new AppError(httpStatus.NOT_FOUND, 'Territory not found.');
+  await assertAdmin(userId, t.orgId);
+
+  const data: any = { updatedAt: new Date() };
+  if (typeof body?.name === 'string') data.name = body.name.slice(0, 60);
+  if (typeof body?.color === 'string') data.color = body.color.slice(0, 16);
+  if (Array.isArray(body?.points)) {
+    const pts = normPoints(body.points);
+    if (pts.length >= 3) data.points = JSON.stringify(pts);
+  }
+  if (Array.isArray(body?.assignedRepIds)) {
+    data.assignedRepIds = body.assignedRepIds
+      .map((s: any) => s.toString())
+      .filter((s: string) => OID.test(s));
+  }
+  if (Array.isArray(body?.assignedRepNames)) {
+    data.assignedRepNames = body.assignedRepNames.map((s: any) => s.toString());
+  }
+
+  const updated = await prisma.canvassTerritory.update({
+    where: { id: territoryId },
+    data,
+  });
+  return shapeTerritory(updated);
+};
+
+const deleteTerritory = async (userId: string, territoryId: string) => {
+  if (!territoryId || !OID.test(territoryId)) return { ok: true };
+  const t = await prisma.canvassTerritory.findUnique({
+    where: { id: territoryId },
+  });
+  if (!t) return { ok: true };
+  await assertAdmin(userId, t.orgId);
+  await prisma.canvassTerritory.delete({ where: { id: territoryId } });
+  return { ok: true };
+};
+
 export const CanvassServices = {
   createPin,
   listPins,
   updatePin,
   assignPin,
   deletePin,
+  createTerritory,
+  listTerritories,
+  updateTerritory,
+  deleteTerritory,
 };

@@ -65,10 +65,52 @@ const deletePin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
         data: result,
     });
 }));
+const createTerritory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Canvass_service_1.CanvassServices.createTerritory(req.user.id, req.params.orgId, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Territory created',
+        data: result,
+    });
+}));
+const listTerritories = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Canvass_service_1.CanvassServices.listTerritories(req.user.id, req.params.orgId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Territories',
+        data: { territories: result },
+    });
+}));
+const updateTerritory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield Canvass_service_1.CanvassServices.updateTerritory(req.user.id, req.params.territoryId, (_a = req.body) !== null && _a !== void 0 ? _a : {});
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Territory updated',
+        data: result,
+    });
+}));
+const deleteTerritory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield Canvass_service_1.CanvassServices.deleteTerritory(req.user.id, req.params.territoryId);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_1.default.OK,
+        success: true,
+        message: 'Territory deleted',
+        data: result,
+    });
+}));
 exports.CanvassControllers = {
     createPin,
     listPins,
     updatePin,
     assignPin,
     deletePin,
+    createTerritory,
+    listTerritories,
+    updateTerritory,
+    deleteTerritory,
 };
