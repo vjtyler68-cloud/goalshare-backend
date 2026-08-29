@@ -19,7 +19,8 @@
     "prettier:check": "prettier --ignore-path .gitignore --write \"**/*.+(js|ts|json)\"",
     "prettier:fix": "prettier --write .",
     "lint-prettier": "yarn lint:check && yarn prettier:check",
-    "test": "node --test test/*.test.js"
+    "test": "npm run build && NODE_ENV=test node --test test/*.test.js",
+    "test:ci": "npm test"
   },
   "keywords": [],
   "author": "",
