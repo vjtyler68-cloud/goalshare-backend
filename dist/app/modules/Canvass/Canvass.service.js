@@ -1329,6 +1329,65 @@ const solarPin = (userId, pinId) => __awaiter(void 0, void 0, void 0, function* 
     });
     return { configured: true, found: !!out, data: out, cached: false };
 });
+// Location sunlight from PVGIS (EU JRC) — free, no key, global coverage.
+const irradiance = async (userId, orgId, body) => {
+    await assertMember(userId, orgId);
+    const lat = Number(body === null || body === void 0 ? void 0 : body.lat);
+    const lon = Number((body === null || body === void 0 ? void 0 : body.lon) ?? (body === null || body === void 0 ? void 0 : body.lng));
+    if (!isFinite(lat) || !isFinite(lon)) {
+        throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "lat and lon are required.");
+    }
+    try {
+        const doFetch = globalThis.fetch;
+        const url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc` +
+            `?lat=${lat}&lon=${lon}&peakpower=1&loss=14` +
+            `&mountingplace=building&optimalangles=1&outputformat=json`;
+        const resp = await doFetch(url, { headers: { accept: "application/json" } });
+        if (!resp.ok)
+            return { configured: true, found: false, data: null };
+        const j = await resp.json();
+        const totals = j?.outputs?.totals?.fixed;
+        const annualIrr = totals ? totals["H(i)_y"] : null;
+        const annualKwh = totals ? totals["E_y"] : null;
+        if (typeof annualIrr !== "number") {
+            return { configured: true, found: false, data: null };
+        }
+        const psh = annualIrr / 365;
+        const tilt = j?.inputs?.mounting_system?.fixed?.slope?.value ?? null;
+        const monthlyRaw = Array.isArray(j?.outputs?.monthly?.fixed)
+            ? j.outputs.monthly.fixed
+            : [];
+        const monthly = monthlyRaw.map((m) => ({
+            month: m.month,
+            irradiance: typeof m["H(i)_m"] === "number" ? m["H(i)_m"] : 0,
+            kwh: typeof m["E_m"] === "number" ? m["E_m"] : 0,
+        }));
+        let rating = "low";
+        if (psh >= 5.5)
+            rating = "excellent";
+        else if (psh >= 4.5)
+            rating = "good";
+        else if (psh >= 3.8)
+            rating = "fair";
+        const score = Math.max(0, Math.min(100, Math.round((psh / 6.5) * 100)));
+        return {
+            configured: true,
+            found: true,
+            data: {
+                peakSunHours: Math.round(psh * 100) / 100,
+                annualIrradiance: Math.round(annualIrr),
+                annualKwhPerKw: typeof annualKwh === "number" ? Math.round(annualKwh) : null,
+                optimalTilt: typeof tilt === "number" ? tilt : null,
+                rating,
+                score,
+                monthly,
+            },
+        };
+    }
+    catch (e) {
+        return { configured: true, found: false, data: null };
+    }
+};
 exports.CanvassServices = {
     createPin,
     listPins,
@@ -1346,4 +1405,5 @@ exports.CanvassServices = {
     seedArea,
     contactPin,
     solarPin,
+    irradiance,
 };

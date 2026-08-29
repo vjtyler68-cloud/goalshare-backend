@@ -215,6 +215,20 @@ const solarPin = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const irradiance = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.irradiance(
+    req.user.id,
+    req.params.orgId,
+    req.body ?? {},
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Sunlight',
+    data: result,
+  });
+});
+
 export const CanvassControllers = {
   createPin,
   listPins,
@@ -232,4 +246,5 @@ export const CanvassControllers = {
   seedArea,
   contactPin,
   solarPin,
+  irradiance,
 };

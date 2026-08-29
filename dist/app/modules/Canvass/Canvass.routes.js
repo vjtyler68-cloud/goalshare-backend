@@ -25,6 +25,8 @@ router.get('/pin/:pinId/enrich', (0, auth_1.default)('ANY'), Canvass_controller_
 router.get('/pin/:pinId/contact', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.contactPin);
 // Google Solar potential for a door (cached).
 router.get('/pin/:pinId/solar', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.solarPin);
+// Location sunlight from PVGIS — free, no key, global coverage.
+router.post('/:orgId/irradiance', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.irradiance);
 router.get('/:orgId/enrich', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.enrich);
 // Territories (drawn areas assigned to reps).
 router.post('/:orgId/territory', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.createTerritory);

@@ -1484,6 +1484,71 @@ const solarPin = async (userId: string, pinId: string) => {
   return { configured: true, found: !!out, data: out, cached: false };
 };
 
+/**
+ * Location sunlight from PVGIS (EU Joint Research Centre) — FREE, no API key,
+ * and global coverage (including rural US where Google Solar has gaps). Given a
+ * lat/lon it returns peak sun hours, annual irradiance, a 1 kWp production
+ * estimate, the optimal tilt and a monthly breakdown. Not cached in the DB:
+ * PVGIS is free and per-location values are stable, so the app caches it
+ * in-memory by coordinate.
+ */
+const irradiance = async (userId: string, orgId: string, body: any) => {
+  await assertMember(userId, orgId);
+  const lat = Number(body?.lat);
+  const lon = Number(body?.lon ?? body?.lng);
+  if (!isFinite(lat) || !isFinite(lon)) {
+    throw new AppError(httpStatus.BAD_REQUEST, "lat and lon are required.");
+  }
+
+  try {
+    const doFetch: any = (globalThis as any).fetch;
+    const url =
+      `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc` +
+      `?lat=${lat}&lon=${lon}&peakpower=1&loss=14` +
+      `&mountingplace=building&optimalangles=1&outputformat=json`;
+    const resp = await doFetch(url, { headers: { accept: "application/json" } });
+    if (!resp.ok) return { configured: true, found: false, data: null };
+    const j = await resp.json();
+    const totals = j?.outputs?.totals?.fixed;
+    // In-plane (tilted) annual irradiation — what a panel actually receives.
+    const annualIrr = totals ? totals["H(i)_y"] : null;
+    const annualKwh = totals ? totals["E_y"] : null;
+    if (typeof annualIrr !== "number") {
+      return { configured: true, found: false, data: null };
+    }
+    const psh = annualIrr / 365; // peak sun hours / day
+    const tilt = j?.inputs?.mounting_system?.fixed?.slope?.value ?? null;
+    const monthlyRaw = Array.isArray(j?.outputs?.monthly?.fixed)
+      ? j.outputs.monthly.fixed
+      : [];
+    const monthly = monthlyRaw.map((m: any) => ({
+      month: m.month,
+      irradiance: typeof m["H(i)_m"] === "number" ? m["H(i)_m"] : 0,
+      kwh: typeof m["E_m"] === "number" ? m["E_m"] : 0,
+    }));
+    let rating = "low";
+    if (psh >= 5.5) rating = "excellent";
+    else if (psh >= 4.5) rating = "good";
+    else if (psh >= 3.8) rating = "fair";
+    const score = Math.max(0, Math.min(100, Math.round((psh / 6.5) * 100)));
+    return {
+      configured: true,
+      found: true,
+      data: {
+        peakSunHours: Math.round(psh * 100) / 100,
+        annualIrradiance: Math.round(annualIrr),
+        annualKwhPerKw: typeof annualKwh === "number" ? Math.round(annualKwh) : null,
+        optimalTilt: typeof tilt === "number" ? tilt : null,
+        rating,
+        score,
+        monthly,
+      },
+    };
+  } catch {
+    return { configured: true, found: false, data: null };
+  }
+};
+
 export const CanvassServices = {
   createPin,
   listPins,
@@ -1501,4 +1566,5 @@ export const CanvassServices = {
   seedArea,
   contactPin,
   solarPin,
+  irradiance,
 };
