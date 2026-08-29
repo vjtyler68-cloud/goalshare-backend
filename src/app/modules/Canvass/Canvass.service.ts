@@ -3,7 +3,16 @@ import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import { addressKey, inPolygon } from "./Canvass.logic";
 
-const prisma = new PrismaClient();
+let prisma = new PrismaClient();
+
+// Allows the service contract suite to exercise real service branches without
+// connecting to MongoDB. This is intentionally not exposed through routes.
+export const setCanvassPrismaForTests = (client: PrismaClient) => {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("The canvass Prisma override is test-only.");
+  }
+  prisma = client;
+};
 const OID = /^[a-f0-9]{24}$/i;
 
 /** A user's active membership in an org (or null). */
@@ -875,11 +884,29 @@ const populateTerritory = async (
         lastVisited: new Date(),
       });
     }
-    const commitClaim = await prisma.canvassTerritory.updateMany({
-      where: { id: territoryId, populationState: "running" },
-      data: { populationState: "committing" },
+    // Claim and insert in one transaction. Cancellation can win before this
+    // transaction starts; once it starts, the insert and completion state are
+    // committed together, leaving no visible "committing but not inserted" gap.
+    const committed = await prisma.$transaction(async (tx) => {
+      const commitClaim = await tx.canvassTerritory.updateMany({
+        where: { id: territoryId, populationState: "running" },
+        data: { populationState: "committing" },
+      });
+      if (commitClaim.count === 0) return false;
+      if (rows.length) await tx.canvassPin.createMany({ data: rows });
+      await tx.canvassTerritory.updateMany({
+        where: { id: territoryId, populationState: "committing" },
+        data: {
+          populationState: "complete",
+          populationCreated: { increment: rows.length },
+          populationSkipped: { increment: skipped },
+          populationError: null,
+          populatedAt: new Date(),
+        },
+      });
+      return true;
     });
-    if (commitClaim.count === 0) {
+    if (!committed) {
       const latest = await prisma.canvassTerritory.findUnique({
         where: { id: territoryId },
       });
@@ -891,17 +918,6 @@ const populateTerritory = async (
         truncated,
       };
     }
-    if (rows.length) await prisma.canvassPin.createMany({ data: rows });
-    await prisma.canvassTerritory.updateMany({
-      where: { id: territoryId, populationState: "committing" },
-      data: {
-        populationState: "complete",
-        populationCreated: { increment: rows.length },
-        populationSkipped: { increment: skipped },
-        populationError: null,
-        populatedAt: new Date(),
-      },
-    });
     const updated = await prisma.canvassTerritory.findUnique({
       where: { id: territoryId },
     });
