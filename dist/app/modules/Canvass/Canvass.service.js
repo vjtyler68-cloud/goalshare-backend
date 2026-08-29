@@ -12,12 +12,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CanvassServices = void 0;
+exports.CanvassServices = exports.setCanvassPrismaForTests = void 0;
 const client_1 = require("@prisma/client");
 const http_status_1 = __importDefault(require("http-status"));
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const Canvass_logic_1 = require("./Canvass.logic");
-const prisma = new client_1.PrismaClient();
+let prisma = new client_1.PrismaClient();
+const setCanvassPrismaForTests = (client) => {
+    if (process.env.NODE_ENV !== "test") {
+        throw new Error("The canvass Prisma override is test-only.");
+    }
+    prisma = client;
+};
+exports.setCanvassPrismaForTests = setCanvassPrismaForTests;
 const OID = /^[a-f0-9]{24}$/i;
 /** A user's active membership in an org (or null). */
 const membershipIn = (userId, orgId) => prisma.orgMembership.findFirst({ where: { orgId, userId, active: true } });
@@ -780,11 +787,28 @@ const populateTerritory = (userId, territoryId, _body) => __awaiter(void 0, void
                 lastVisited: new Date(),
             });
         }
-        const commitClaim = yield prisma.canvassTerritory.updateMany({
-            where: { id: territoryId, populationState: "running" },
-            data: { populationState: "committing" },
-        });
-        if (commitClaim.count === 0) {
+            const committed = yield prisma.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+                const commitClaim = yield tx.canvassTerritory.updateMany({
+                    where: { id: territoryId, populationState: "running" },
+                    data: { populationState: "committing" },
+                });
+                if (commitClaim.count === 0)
+                    return false;
+                if (rows.length)
+                    yield tx.canvassPin.createMany({ data: rows });
+                yield tx.canvassTerritory.updateMany({
+                    where: { id: territoryId, populationState: "committing" },
+                    data: {
+                        populationState: "complete",
+                        populationCreated: { increment: rows.length },
+                        populationSkipped: { increment: skipped },
+                        populationError: null,
+                        populatedAt: new Date(),
+                    },
+                });
+                return true;
+            }));
+            if (!committed) {
             const latest = yield prisma.canvassTerritory.findUnique({
                 where: { id: territoryId },
             });
@@ -796,18 +820,6 @@ const populateTerritory = (userId, territoryId, _body) => __awaiter(void 0, void
                 truncated,
             };
         }
-        if (rows.length)
-            yield prisma.canvassPin.createMany({ data: rows });
-        yield prisma.canvassTerritory.updateMany({
-            where: { id: territoryId, populationState: "committing" },
-            data: {
-                populationState: "complete",
-                populationCreated: { increment: rows.length },
-                populationSkipped: { increment: skipped },
-                populationError: null,
-                populatedAt: new Date(),
-            },
-        });
         const updated = yield prisma.canvassTerritory.findUnique({
             where: { id: territoryId },
         });
