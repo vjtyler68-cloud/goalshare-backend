@@ -23,6 +23,8 @@ router.delete('/pin/:pinId', (0, auth_1.default)('ANY'), Canvass_controller_1.Ca
 router.get('/pin/:pinId/enrich', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.enrichPin);
 // Skip-trace a door for resident name + phone + email (cached).
 router.get('/pin/:pinId/contact', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.contactPin);
+// Google Solar potential for a door (cached).
+router.get('/pin/:pinId/solar', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.solarPin);
 router.get('/:orgId/enrich', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.enrich);
 // Territories (drawn areas assigned to reps).
 router.post('/:orgId/territory', (0, auth_1.default)('ANY'), Canvass_controller_1.CanvassControllers.createTerritory);

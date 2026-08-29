@@ -205,6 +205,16 @@ const contactPin = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const solarPin = catchAsync(async (req: Request, res: Response) => {
+  const result = await CanvassServices.solarPin(req.user.id, req.params.pinId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Solar potential',
+    data: result,
+  });
+});
+
 export const CanvassControllers = {
   createPin,
   listPins,
@@ -221,4 +231,5 @@ export const CanvassControllers = {
   enrichPin,
   seedArea,
   contactPin,
+  solarPin,
 };

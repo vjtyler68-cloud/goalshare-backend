@@ -79,6 +79,8 @@ const shapePin = (p: any) => {
     enrichedAt: p.enrichedAt ?? null,
     contact: parseJson(p.contact, null),
     contactAt: p.contactAt ?? null,
+    solar: parseJson(p.solar, null),
+    solarAt: p.solarAt ?? null,
     visitCount: p.visitCount,
     lastVisited: p.lastVisited,
     createdAt: p.createdAt,
@@ -1401,6 +1403,87 @@ const contactPin = async (userId: string, pinId: string) => {
   return { configured: true, found: !!out, data: out, cached: false };
 };
 
+/**
+ * Google Solar potential for a door (the "Project Sunroof" data). Cached on the
+ * pin so it's one lookup per door, ever. Returns {configured:false} until the
+ * GOOGLE_SOLAR_API_KEY is set; found:false when Google has no coverage there.
+ */
+const solarPin = async (userId: string, pinId: string) => {
+  if (!pinId || !OID.test(pinId)) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Bad pin id.");
+  }
+  const pin = await prisma.canvassPin.findUnique({ where: { id: pinId } });
+  if (!pin) throw new AppError(httpStatus.NOT_FOUND, "Pin not found.");
+  await assertMember(userId, pin.orgId);
+
+  if (pin.solarAt) {
+    return {
+      configured: true,
+      found: !!pin.solar,
+      data: parseJson(pin.solar, null),
+      cached: true,
+    };
+  }
+
+  const key = process.env.GOOGLE_SOLAR_API_KEY;
+  if (!key) return { configured: false, found: false, data: null };
+
+  let out: any = null;
+  try {
+    const doFetch: any = (globalThis as any).fetch;
+    const url =
+      `https://solar.googleapis.com/v1/buildingInsights:findClosest` +
+      `?location.latitude=${pin.lat}&location.longitude=${pin.lng}` +
+      `&requiredQuality=LOW&key=${key}`;
+    const resp = await doFetch(url, { headers: { accept: "application/json" } });
+    if (resp.ok) {
+      const j = await resp.json();
+      const sp = j?.solarPotential;
+      if (sp) {
+        const sunshine =
+          typeof sp.maxSunshineHoursPerYear === "number"
+            ? sp.maxSunshineHoursPerYear
+            : null;
+        const maxPanels =
+          typeof sp.maxArrayPanelsCount === "number"
+            ? sp.maxArrayPanelsCount
+            : null;
+        const roofAreaM2 = sp.wholeRoofStats?.areaMeters2 ?? null;
+        const configs = Array.isArray(sp.solarPanelConfigs)
+          ? sp.solarPanelConfigs
+          : [];
+        const best = configs.length ? configs[configs.length - 1] : null;
+        const yearlyKwh =
+          best && typeof best.yearlyEnergyDcKwh === "number"
+            ? best.yearlyEnergyDcKwh
+            : null;
+        // Simple fit tier for pin colouring: good / ok / poor.
+        let fit = "poor";
+        if ((maxPanels ?? 0) >= 15 && (sunshine ?? 0) >= 1200) fit = "good";
+        else if ((maxPanels ?? 0) >= 6 && (sunshine ?? 0) >= 900) fit = "ok";
+        out = {
+          fit,
+          sunshineHours: sunshine,
+          maxPanels,
+          roofAreaM2,
+          yearlyKwh,
+          panelCapacityWatts: sp.panelCapacityWatts ?? null,
+          imageryQuality: j.imageryQuality ?? null,
+        };
+      }
+    }
+  } catch {
+    out = null;
+  }
+
+  await prisma.canvassPin.update({
+    where: { id: pinId },
+    data: { solar: out ? JSON.stringify(out) : null, solarAt: new Date() },
+  });
+
+  return { configured: true, found: !!out, data: out, cached: false };
+};
+
 export const CanvassServices = {
   createPin,
   listPins,
@@ -1417,4 +1500,5 @@ export const CanvassServices = {
   enrichPin,
   seedArea,
   contactPin,
+  solarPin,
 };

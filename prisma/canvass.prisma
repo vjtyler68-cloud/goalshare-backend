@@ -55,6 +55,11 @@ model CanvassPin {
     contact   String?
     contactAt DateTime?
 
+    // Cached Google Solar potential (JSON: {fit, sunshineHours, maxPanels, ...}).
+    // solarAt marks a lookup happened (one lookup per door, ever).
+    solar   String?
+    solarAt DateTime?
+
     visitCount  Int      @default(1)
     lastVisited DateTime @default(now())
 
