@@ -202,6 +202,22 @@ const updatePin = (userId, pinId, body) => __awaiter(void 0, void 0, void 0, fun
         data.phone = body.phone;
     if (typeof (body === null || body === void 0 ? void 0 : body.address) === "string")
         data.address = body.address;
+    // Reposition — the pin was dragged onto the right roof. Only accept a valid
+    // coordinate pair.
+    if ((body === null || body === void 0 ? void 0 : body.lat) !== undefined &&
+        (body === null || body === void 0 ? void 0 : body.lng) !== undefined) {
+        const la = Number(body.lat);
+        const lo = Number(body.lng);
+        if (Number.isFinite(la) &&
+            Number.isFinite(lo) &&
+            la >= -90 &&
+            la <= 90 &&
+            lo >= -180 &&
+            lo <= 180) {
+            data.lat = la;
+            data.lng = lo;
+        }
+    }
     if (typeof (body === null || body === void 0 ? void 0 : body.stage) === "string" &&
         ["lead", "sale", "approved", "installed"].includes(body.stage)) {
         data.stage = body.stage;

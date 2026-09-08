@@ -197,6 +197,24 @@ const updatePin = async (userId: string, pinId: string, body: any) => {
   if (typeof body?.phone === "string") data.phone = body.phone;
   if (typeof body?.address === "string") data.address = body.address;
 
+  // Reposition — the pin was dragged onto the right roof. Only accept a valid
+  // coordinate pair.
+  if (body?.lat !== undefined && body?.lng !== undefined) {
+    const la = Number(body.lat);
+    const lo = Number(body.lng);
+    if (
+      Number.isFinite(la) &&
+      Number.isFinite(lo) &&
+      la >= -90 &&
+      la <= 90 &&
+      lo >= -180 &&
+      lo <= 180
+    ) {
+      data.lat = la;
+      data.lng = lo;
+    }
+  }
+
   if (
     typeof body?.stage === "string" &&
     ["lead", "sale", "approved", "installed"].includes(body.stage)
