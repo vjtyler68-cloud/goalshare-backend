@@ -21,6 +21,7 @@ import { SharingRoutes } from '../modules/Sharing/Sharing.routes';
 import { CirclesRoutes } from '../modules/Circles/Circles.routes';
 import { OrgRoutes } from '../modules/Org/Org.routes';
 import { CanvassRoutes } from '../modules/Canvass/Canvass.routes';
+import { Challenge75Routes } from '../modules/Challenge75/Challenge75.routes';
 
 const router = express.Router();
 
@@ -112,6 +113,10 @@ const moduleRoutes = [
   {
     path: '/canvass',
     route: CanvassRoutes,
+  },
+  {
+    path: '/challenge75',
+    route: Challenge75Routes,
   },
 ];
 

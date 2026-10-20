@@ -1,0 +1,38 @@
+// 75 Challenge crews — optional friend accountability for the 75-day challenge.
+// A crew is a small invite-code group; each member publishes a lightweight
+// progress summary (day, streak, today's %) that the others can see. Runs on the
+// app's own account auth (JWT), so no Firebase / anonymous sign-in is involved.
+model Challenge75Crew {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    code      String   @unique // short invite code (e.g. "K7Q2MX")
+    name      String   @default("My 75 Crew")
+    ownerId   String   @db.ObjectId
+    memberIds String[] @db.ObjectId
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("challenge75crew")
+}
+
+// One member's shared progress line within a crew. Denormalised name so the
+// roster renders without extra user lookups.
+model Challenge75Member {
+    id     String @id @default(auto()) @map("_id") @db.ObjectId
+    crewId String @db.ObjectId
+    userId String @db.ObjectId
+    name   String @default("")
+
+    variantId       String  @default("")
+    day             Int     @default(0)
+    daysCompleted   Int     @default(0)
+    streak          Int     @default(0)
+    completionToday Float   @default(0)
+    todayComplete   Boolean @default(false)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([crewId, userId])
+    @@map("challenge75member")
+}
